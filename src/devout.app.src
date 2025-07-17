@@ -1,0 +1,44 @@
+{application, devout, [
+    {description, "Devin Clone MCP Server - File System Operations"},
+    {vsn, "0.1.0"},
+    {registered, [devout_server]},
+    {mod, {devout_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        crypto,
+        ssl,
+        lager,
+        jsx,
+        erlmcp
+    ]},
+    {env, [
+        {mcp_server_config, [
+            {transport, stdio},
+            {name, <<"devout-fs">>},
+            {version, <<"0.1.0">>},
+            {vendor, <<"erlsci">>},
+            {description, <<"File system operations for Devin clone">>}
+        ]},
+        {allowed_operations, [
+            show_cwd,
+            change_cwd,
+            create_file,
+            delete_file,
+            create_directory,
+            remove_directory
+        ]},
+        {base_directory, undefined}  % Will be set at runtime to current working directory
+    ]},
+    {modules, [
+        devout_app,
+        devout_sup,
+        devout_server,
+        devout_fs_ops,
+        devout_path_validator
+    ]},
+    {licenses, ["Apache-2.0"]},
+    {links, [
+        {"GitHub", "https://github.com/erlsci/devout"}
+    ]}
+]}.

@@ -1,0 +1,73 @@
+## VM Arguments for Devout MCP Server
+
+## Name of the node
+-name devout@127.0.0.1
+
+## Cookie for distributed erlang
+-setcookie devout_mcp_server
+
+## Heartbeat management; auto-restarts VM if it dies or becomes unresponsive
+-heart
+
+## Enable kernel poll and async threads
++K true
++A 64
+
+## Increase number of concurrent ports/sockets
+-env ERL_MAX_PORTS 65536
+
+## Increase number of processes
++P 1048576
+
+## Set schedulers equal to CPU cores
++S auto
+
+## Memory allocators
++MBas aobf
++MHas aobf
++MBlmbcs 512
++MHlmbcs 512
+
+## Garbage collection options
++hms 8192
++hmbs 8192
+
+## Distribution buffer size
++zdbbl 8192
+
+## Enable SMP support
+-smp enable
+
+## Async thread pool size
++A 64
+
+## IO polling
++IOt true
+
+## Disable legacy erl_eval
+-eval_fun true
+
+## Set ETS table limit
++e 256000
+
+## Set atom table size
++t 1048576
+
+## Enable dirty scheduler support
++SDcpu auto
++SDio auto
+
+## Crash dumps
+-env ERL_CRASH_DUMP ./erl_crash.dump
+-env ERL_CRASH_DUMP_SECONDS 30
+
+## Disable EPMD for security
+-start_epmd false
+-epmd_module nomodule
+
+## Standard input/output options for MCP
+-noshell
+-noinput
+
+## Logging
+-env ERL_MAX_ETS_TABLES 256000
