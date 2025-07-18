@@ -1,10 +1,17 @@
-# Devout - Devin Clone MCP Server
+# Devout
 
-A Model Context Protocol (MCP) server implementation in Erlang that provides secure file system operations for AI assistants. This server is designed to be a foundation for building Devin-like AI coding assistants.
+[![Build Status][gh-actions-badge]][gh-actions]
+
+[![Project Logo][logo]][logo-large]
+
+*A Devin Clone MCP Server*
+
+A Model Context Protocol (MCP) server implementation in Erlang that provides secure file and version control operations for software projects. This server is designed to be a foundation for building Devin-like AI coding assistants.
 
 ## Features
 
 ### File System Operations
+
 - **Show Current Directory**: Display the current working directory
 - **Change Directory**: Navigate to relative paths only
 - **Create Files**: Create files with optional content
@@ -13,6 +20,7 @@ A Model Context Protocol (MCP) server implementation in Erlang that provides sec
 - **Remove Directories**: Remove directories, optionally with all contents
 
 ### Security Features
+
 - **Relative Path Only**: All operations are restricted to relative paths
 - **Base Directory Restriction**: Operations are confined to the base directory and its subdirectories
 - **Path Validation**: Comprehensive path validation to prevent directory traversal attacks
@@ -27,17 +35,20 @@ A Model Context Protocol (MCP) server implementation in Erlang that provides sec
 ## Installation
 
 1. **Clone the repository**:
+
 ```bash
 git clone <repository-url>
 cd devout
 ```
 
 2. **Build the project**:
+
 ```bash
 make build
 ```
 
 3. **Run tests** (optional):
+
 ```bash
 make test
 ```
@@ -47,11 +58,13 @@ make test
 ### Starting the Server
 
 For development:
+
 ```bash
 make dev
 ```
 
 For MCP client integration (stdio mode):
+
 ```bash
 make start-mcp
 ```
@@ -77,11 +90,13 @@ To use this server with Claude Desktop or other MCP clients, add the following t
 ## Available Tools
 
 ### `show_cwd`
+
 Shows the current working directory.
 
 **Parameters**: None
 
 **Example Response**:
+
 ```json
 {
   "status": "success",
@@ -90,12 +105,15 @@ Shows the current working directory.
 ```
 
 ### `change_cwd`
+
 Changes the current working directory to a relative path.
 
 **Parameters**:
+
 - `path` (string): Relative path to change to
 
 **Example**:
+
 ```json
 {
   "path": "src/modules"
@@ -103,13 +121,16 @@ Changes the current working directory to a relative path.
 ```
 
 ### `create_file`
+
 Creates a new file with optional content.
 
 **Parameters**:
+
 - `path` (string): Relative path for the new file
 - `content` (string, optional): Content for the file
 
 **Example**:
+
 ```json
 {
   "path": "src/hello.erl",
@@ -118,12 +139,15 @@ Creates a new file with optional content.
 ```
 
 ### `delete_file`
+
 Deletes a file.
 
 **Parameters**:
+
 - `path` (string): Relative path of the file to delete
 
 **Example**:
+
 ```json
 {
   "path": "temp/old_file.txt"
@@ -131,12 +155,15 @@ Deletes a file.
 ```
 
 ### `create_directory`
+
 Creates a directory and all necessary parent directories.
 
 **Parameters**:
+
 - `path` (string): Relative path for the new directory
 
 **Example**:
+
 ```json
 {
   "path": "src/modules/utils"
@@ -144,13 +171,16 @@ Creates a directory and all necessary parent directories.
 ```
 
 ### `remove_directory`
+
 Removes a directory, optionally with all contents.
 
 **Parameters**:
+
 - `path` (string): Relative path of the directory to remove
 - `recursive` (boolean, optional): Remove directory and all contents recursively (default: false)
 
 **Example**:
+
 ```json
 {
   "path": "temp/old_dir",
@@ -181,31 +211,37 @@ This server is designed with security in mind:
 ## Development
 
 ### Building
+
 ```bash
 make build
 ```
 
 ### Testing
+
 ```bash
 make test
 ```
 
 ### Type Checking
+
 ```bash
 make dialyzer
 ```
 
 ### Code Analysis
+
 ```bash
 make xref
 ```
 
 ### All Checks
+
 ```bash
 make check
 ```
 
 ### Development Shell
+
 ```bash
 make shell
 ```
@@ -222,6 +258,7 @@ Configuration is managed through `config/sys.config`. Key settings include:
 ## Logging
 
 The server uses Lager for logging with multiple backends:
+
 - Console output for development
 - File logging for production
 - Structured logging for debugging
@@ -235,10 +272,6 @@ Log files are stored in the `logs/` directory.
 3. Make your changes
 4. Run tests and checks: `make check`
 5. Submit a pull request
-
-## License
-
-Apache License 2.0 - See LICENSE file for details.
 
 ## Roadmap
 
@@ -254,3 +287,18 @@ Apache License 2.0 - See LICENSE file for details.
 ## Support
 
 For issues, questions, or contributions, please visit the [GitHub repository](https://github.com/erlsci/devout).
+
+## License
+
+Apache 2.0 - See LICENSE file for details.
+
+## External Resources
+
+- [Get started with the Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction)
+
+[//]: ---Named-Links---
+
+[logo]: priv/images/project-logo.png
+[logo-large]: priv/images/project-logo-large.png
+[gh-actions-badge]: https://github.com/erlsci/devout/workflows/ci/badge.svg
+[gh-actions]: https://github.com/erlsci/devout/actions?query=workflow%3Aci
