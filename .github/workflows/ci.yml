@@ -1,0 +1,36 @@
+name: ci
+
+on:
+  push:
+    branches: [main, 'release/**', 'task/**', 'feature/**', 'epic/**']
+    tags: ['**']
+  pull_request:
+    branches: [main, 'release/**', 'task/**', 'feature/**', 'epic/**']
+
+jobs:
+
+  test:
+    name: Erlang ${{ matrix.otp_version }} build
+    runs-on: ubuntu-22.04
+
+    strategy:
+      matrix:
+        otp_version: [25, 26, 27, 28]
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: erlef/setup-beam@v1
+      with:
+        otp-version: ${{ matrix.otp_version }}
+        rebar3-version: ${{ matrix.otp_version >= 26 && '3.25' || '3.22' }}
+    - name: Check rebar3 Version
+      run: rebar3 --version
+    - name: Compile
+      run: rebar3 compile
+    - name: Xref Checks
+      run: rebar3 xref
+
+    - name: Run Tests
+      run: rebar3 eunit -v
+    - name: Test Coverage
+      run: rebar3 as test cover -v --min_coverage=0
