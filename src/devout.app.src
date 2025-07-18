@@ -1,7 +1,7 @@
 {application, devout, [
-    {description, "Devin Clone MCP Server - File System Operations"},
-    {vsn, "0.1.0"},
-    {registered, [devout_server]},
+    {description, "Secure File Manager MCP Server - File System Operations"},
+    {vsn, "1.0.0"},
+    {registered, [devout_server, devout_sup]},
     {mod, {devout_app, []}},
     {applications, [
         kernel,
@@ -16,26 +16,31 @@
         {mcp_server_config, [
             {transport, stdio},
             {name, <<"devout-fs">>},
-            {version, <<"0.1.0">>},
+            {version, <<"1.0.0">>},
             {vendor, <<"erlsci">>},
-            {description, <<"File system operations for Devin clone">>}
+            {description, <<"Secure file system operations for AI assistants">>}
         ]},
         {allowed_operations, [
+            new_dir,
+            new_dirs,
+            move,
+            write,
+            read,
             show_cwd,
-            change_cwd,
-            create_file,
-            delete_file,
-            create_directory,
-            remove_directory
+            change_cwd
         ]},
-        {base_directory, undefined}  % Will be set at runtime to current working directory
+        {base_directory, undefined},  % Will be set at runtime to current working directory
+        {max_file_size, 10485760},    % 10MB max file size
+        {allowed_extensions, all},    % or list of allowed extensions like [<<".txt">>, <<".md">>, <<".json">>]
+        {enable_recursive_delete, false}  % Safety: disable recursive directory deletion by default
     ]},
     {modules, [
         devout_app,
         devout_sup,
         devout_server,
         devout_fs_ops,
-        devout_path_validator
+        devout_path_validator,
+        devout_stdio_main
     ]},
     {licenses, ["Apache-2.0"]},
     {links, [

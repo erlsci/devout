@@ -1,182 +1,91 @@
 %%%-------------------------------------------------------------------
 %%% @doc
-%%% MCP Server implementation - Main server process that handles MCP protocol
-%%% and exposes file system operations as tools
+%%% Devout MCP server - Main server that coordinates with erlmcp_stdio
+%%% Combines the best of both approaches: simple erlmcp integration with
+%%% robust security and error handling
 %%% @end
 %%%-------------------------------------------------------------------
 -module(devout_server).
-
 -behaviour(gen_server).
 
 %% API
--export([
-    start_link/0,
-    stop/0
-]).
+-export([start_link/0, start_stdio/0, stop/0]).
 
 %% gen_server callbacks
--export([
-    init/1,
-    handle_call/3,
-    handle_cast/2,
-    handle_info/2,
-    terminate/2,
-    code_change/3
-]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include_lib("kernel/include/logger.hrl").
 
--define(SERVER, ?MODULE).
-
-%% Server state
 -record(state, {
-    mcp_server :: pid(),
-    server_config :: map(),
-    base_directory :: string()
+    stdio_started = false :: boolean(),
+    base_directory :: string(),
+    server_config :: map()
 }).
 
+-type state() :: #state{}.
+
 %%====================================================================
-%% API
+%% API functions
 %%====================================================================
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Starts the server
-%% @end
-%%--------------------------------------------------------------------
--spec start_link() -> {ok, pid()} | ignore | {error, term()}.
 start_link() ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Stops the server
-%% @end
-%%--------------------------------------------------------------------
--spec stop() -> ok.
+start_stdio() ->
+    gen_server:call(?MODULE, start_stdio).
+
 stop() ->
-    gen_server:call(?SERVER, stop).
+    gen_server:stop(?MODULE).
 
 %%====================================================================
 %% gen_server callbacks
 %%====================================================================
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Initializes the server
-%% @end
-%%--------------------------------------------------------------------
--spec init(Args) -> {ok, State} | {ok, State, timeout() | hibernate} |
-    {stop, Reason} | ignore when
-    Args :: term(),
-    State :: #state{},
-    Reason :: term().
 init([]) ->
+    process_flag(trap_exit, true),
     ?LOG_INFO("Initializing Devout MCP server"),
     
     % Get configuration
     {ok, ServerConfig} = application:get_env(devout, mcp_server_config),
     {ok, BaseDir} = application:get_env(devout, base_directory),
     
-    % Create MCP server capabilities
-    Capabilities = #{
-        tools => create_tool_definitions(),
-        resources => [],
-        prompts => []
+    State = #state{
+        server_config = ServerConfig,
+        base_directory = BaseDir
     },
     
-    % Start MCP server
-    case erlmcp_server:start_link({stdio, []}, Capabilities) of
-        {ok, McpServer} ->
-            % Register tools
-            register_tools(McpServer),
-            
-            State = #state{
-                mcp_server = McpServer,
-                server_config = ServerConfig,
-                base_directory = BaseDir
-            },
-            
-            ?LOG_INFO("Devout MCP server initialized successfully"),
-            {ok, State};
-        Error ->
-            ?LOG_ERROR("Failed to start MCP server: ~p", [Error]),
-            {stop, Error}
-    end.
+    ?LOG_INFO("Devout MCP server initialized with base directory: ~s", [BaseDir]),
+    {ok, State}.
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Handling call messages
-%% @end
-%%--------------------------------------------------------------------
--spec handle_call(Request, From, State) -> {reply, Reply, State} |
-    {reply, Reply, State, timeout() | hibernate} |
-    {noreply, State} |
-    {noreply, State, timeout() | hibernate} |
-    {stop, Reason, Reply, State} |
-    {stop, Reason, State} when
-    Request :: term(),
-    From :: {pid(), Tag :: term()},
-    State :: #state{},
-    Reply :: term(),
-    Reason :: term().
+handle_call(start_stdio, _From, #state{stdio_started = false} = State) ->
+    case setup_stdio_server() of
+        ok ->
+            ?LOG_INFO("Stdio server started successfully"),
+            {reply, ok, State#state{stdio_started = true}};
+        {error, Reason} ->
+            ?LOG_ERROR("Failed to start stdio server: ~p", [Reason]),
+            {reply, {error, Reason}, State}
+    end;
+
+handle_call(start_stdio, _From, #state{stdio_started = true} = State) ->
+    {reply, {error, already_started}, State};
+
 handle_call(stop, _From, State) ->
     {stop, normal, ok, State};
+
 handle_call(_Request, _From, State) ->
     {reply, {error, unknown_request}, State}.
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Handling cast messages
-%% @end
-%%--------------------------------------------------------------------
--spec handle_cast(Msg, State) -> {noreply, State} |
-    {noreply, State, timeout() | hibernate} |
-    {stop, Reason, State} when
-    Msg :: term(),
-    State :: #state{},
-    Reason :: term().
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Handling all non call/cast messages
-%% @end
-%%--------------------------------------------------------------------
--spec handle_info(Info, State) -> {noreply, State} |
-    {noreply, State, timeout() | hibernate} |
-    {stop, Reason, State} when
-    Info :: term(),
-    State :: #state{},
-    Reason :: term().
 handle_info(_Info, State) ->
     {noreply, State}.
 
-%%--------------------------------------------------------------------
-%% @doc
-%% This function is called by a gen_server when it is about to
-%% terminate. It should be the opposite of Module:init/1 and do any
-%% necessary cleaning up.
-%% @end
-%%--------------------------------------------------------------------
--spec terminate(Reason, State) -> ok when
-    Reason :: normal | shutdown | {shutdown, term()} | term(),
-    State :: #state{}.
 terminate(_Reason, _State) ->
     ?LOG_INFO("Devout MCP server terminating"),
     ok.
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Convert process state when code is changed
-%% @end
-%%--------------------------------------------------------------------
--spec code_change(OldVsn, State, Extra) -> {ok, NewState} when
-    OldVsn :: term() | {down, term()},
-    State :: #state{},
-    Extra :: term(),
-    NewState :: #state{}.
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
@@ -184,267 +93,440 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal functions
 %%====================================================================
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Create tool definitions for MCP
-%% @end
-%%--------------------------------------------------------------------
--spec create_tool_definitions() -> list().
-create_tool_definitions() ->
-    [
-        #{
-            name => <<"show_cwd">>,
-            description => <<"Show current working directory">>,
-            inputSchema => #{
-                type => <<"object">>,
-                properties => #{},
-                required => []
-            }
-        },
-        #{
-            name => <<"change_cwd">>,
-            description => <<"Change current working directory to a relative path">>,
-            inputSchema => #{
-                type => <<"object">>,
-                properties => #{
-                    path => #{
-                        type => <<"string">>,
-                        description => <<"Relative path to change to">>
-                    }
-                },
-                required => [<<"path">>]
-            }
-        },
-        #{
-            name => <<"create_file">>,
-            description => <<"Create a file with optional content">>,
-            inputSchema => #{
-                type => <<"object">>,
-                properties => #{
-                    path => #{
-                        type => <<"string">>,
-                        description => <<"Relative path for the new file">>
-                    },
-                    content => #{
-                        type => <<"string">>,
-                        description => <<"Content for the file (optional)">>
-                    }
-                },
-                required => [<<"path">>]
-            }
-        },
-        #{
-            name => <<"delete_file">>,
-            description => <<"Delete a file">>,
-            inputSchema => #{
-                type => <<"object">>,
-                properties => #{
-                    path => #{
-                        type => <<"string">>,
-                        description => <<"Relative path of the file to delete">>
-                    }
-                },
-                required => [<<"path">>]
-            }
-        },
-        #{
-            name => <<"create_directory">>,
-            description => <<"Create a directory and all necessary parent directories">>,
-            inputSchema => #{
-                type => <<"object">>,
-                properties => #{
-                    path => #{
-                        type => <<"string">>,
-                        description => <<"Relative path for the new directory">>
-                    }
-                },
-                required => [<<"path">>]
-            }
-        },
-        #{
-            name => <<"remove_directory">>,
-            description => <<"Remove a directory, optionally with all contents">>,
-            inputSchema => #{
-                type => <<"object">>,
-                properties => #{
-                    path => #{
-                        type => <<"string">>,
-                        description => <<"Relative path of the directory to remove">>
-                    },
-                    recursive => #{
-                        type => <<"boolean">>,
-                        description => <<"Remove directory and all contents recursively (default: false)">>
-                    }
-                },
-                required => [<<"path">>]
-            }
-        }
-    ].
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Register tools with the MCP server
-%% @end
-%%--------------------------------------------------------------------
--spec register_tools(McpServer) -> ok when
-    McpServer :: pid().
-register_tools(McpServer) ->
-    % Show current working directory
-    erlmcp_server:add_tool_with_schema(McpServer, <<"show_cwd">>, 
-        fun(_Args) -> handle_show_cwd() end, 
-        #{type => <<"object">>, properties => #{}}),
-    
-    % Change current working directory
-    erlmcp_server:add_tool_with_schema(McpServer, <<"change_cwd">>,
-        fun(Args) -> handle_change_cwd(Args) end,
-        #{type => <<"object">>, 
-          properties => #{path => #{type => <<"string">>}},
-          required => [<<"path">>]}),
-    
-    % Create file
-    erlmcp_server:add_tool_with_schema(McpServer, <<"create_file">>,
-        fun(Args) -> handle_create_file(Args) end,
-        #{type => <<"object">>,
-          properties => #{
-              path => #{type => <<"string">>},
-              content => #{type => <<"string">>}
-          },
-          required => [<<"path">>]}),
-    
-    % Delete file
-    erlmcp_server:add_tool_with_schema(McpServer, <<"delete_file">>,
-        fun(Args) -> handle_delete_file(Args) end,
-        #{type => <<"object">>,
-          properties => #{path => #{type => <<"string">>}},
-          required => [<<"path">>]}),
-    
-    % Create directory
-    erlmcp_server:add_tool_with_schema(McpServer, <<"create_directory">>,
-        fun(Args) -> handle_create_directory(Args) end,
-        #{type => <<"object">>,
-          properties => #{path => #{type => <<"string">>}},
-          required => [<<"path">>]}),
-    
-    % Remove directory
-    erlmcp_server:add_tool_with_schema(McpServer, <<"remove_directory">>,
-        fun(Args) -> handle_remove_directory(Args) end,
-        #{type => <<"object">>,
-          properties => #{
-              path => #{type => <<"string">>},
-              recursive => #{type => <<"boolean">>}
-          },
-          required => [<<"path">>]}),
-    
-    ?LOG_INFO("All tools registered successfully"),
-    ok.
-
-%%====================================================================
-%% Tool handlers
-%%====================================================================
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Handle show_cwd tool call
-%% @end
-%%--------------------------------------------------------------------
--spec handle_show_cwd() -> binary().
-handle_show_cwd() ->
-    case devout_fs_ops:show_cwd() of
-        {ok, Cwd} ->
-            jsx:encode(#{status => success, cwd => list_to_binary(Cwd)});
+setup_stdio_server() ->
+    case erlmcp_stdio:start() of
+        ok ->
+            setup_tools(),
+            setup_resources(),
+            setup_prompts(),
+            ok;
         {error, Reason} ->
-            jsx:encode(#{status => error, reason => format_error(Reason)})
+            {error, Reason}
     end.
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Handle change_cwd tool call
-%% @end
-%%--------------------------------------------------------------------
--spec handle_change_cwd(Args) -> binary() when
-    Args :: map().
+setup_tools() ->
+    %% Add new-dir tool
+    ok = erlmcp_stdio:add_tool(
+        <<"new-dir">>, 
+        <<"Create a new directory">>,
+        fun handle_new_dir/1,
+        #{
+            <<"type">> => <<"object">>,
+            <<"properties">> => #{
+                <<"path">> => #{
+                    <<"type">> => <<"string">>,
+                    <<"description">> => <<"Relative path for the directory to create">>
+                }
+            },
+            <<"required">> => [<<"path">>]
+        }
+    ),
+    
+    %% Add new-dirs tool (create directory with children)
+    ok = erlmcp_stdio:add_tool(
+        <<"new-dirs">>, 
+        <<"Create a directory with child directories">>,
+        fun handle_new_dirs/1,
+        #{
+            <<"type">> => <<"object">>,
+            <<"properties">> => #{
+                <<"path">> => #{
+                    <<"type">> => <<"string">>,
+                    <<"description">> => <<"Base directory path to create">>
+                },
+                <<"children">> => #{
+                    <<"type">> => <<"array">>,
+                    <<"items">> => #{<<"type">> => <<"string">>},
+                    <<"description">> => <<"Child directory names to create">>
+                }
+            },
+            <<"required">> => [<<"path">>]
+        }
+    ),
+    
+    %% Add move tool
+    ok = erlmcp_stdio:add_tool(
+        <<"move">>, 
+        <<"Move or rename a file or directory">>,
+        fun handle_move/1,
+        #{
+            <<"type">> => <<"object">>,
+            <<"properties">> => #{
+                <<"source">> => #{
+                    <<"type">> => <<"string">>,
+                    <<"description">> => <<"Relative path of source file/directory">>
+                },
+                <<"destination">> => #{
+                    <<"type">> => <<"string">>,
+                    <<"description">> => <<"Relative path of destination">>
+                }
+            },
+            <<"required">> => [<<"source">>, <<"destination">>]
+        }
+    ),
+    
+    %% Add write tool
+    ok = erlmcp_stdio:add_tool(
+        <<"write">>, 
+        <<"Create or write to a file">>,
+        fun handle_write/1,
+        #{
+            <<"type">> => <<"object">>,
+            <<"properties">> => #{
+                <<"path">> => #{
+                    <<"type">> => <<"string">>,
+                    <<"description">> => <<"Relative path for the file">>
+                },
+                <<"content">> => #{
+                    <<"type">> => <<"string">>,
+                    <<"description">> => <<"Content to write to the file">>
+                },
+                <<"mode">> => #{
+                    <<"type">> => <<"string">>,
+                    <<"enum">> => [<<"write">>, <<"append">>],
+                    <<"description">> => <<"Write mode: write (overwrite) or append">>,
+                    <<"default">> => <<"write">>
+                }
+            },
+            <<"required">> => [<<"path">>, <<"content">>]
+        }
+    ),
+    
+    %% Add read tool
+    ok = erlmcp_stdio:add_tool(
+        <<"read">>, 
+        <<"Read a file">>,
+        fun handle_read/1,
+        #{
+            <<"type">> => <<"object">>,
+            <<"properties">> => #{
+                <<"path">> => #{
+                    <<"type">> => <<"string">>,
+                    <<"description">> => <<"Relative path of the file to read">>
+                }
+            },
+            <<"required">> => [<<"path">>]
+        }
+    ),
+    
+    %% Add show_cwd tool (from devout)
+    ok = erlmcp_stdio:add_tool(
+        <<"show-cwd">>, 
+        <<"Show current working directory">>,
+        fun handle_show_cwd/1,
+        #{
+            <<"type">> => <<"object">>,
+            <<"properties">> => #{},
+            <<"required">> => []
+        }
+    ),
+    
+    %% Add change_cwd tool (from devout)
+    ok = erlmcp_stdio:add_tool(
+        <<"change-cwd">>, 
+        <<"Change current working directory">>,
+        fun handle_change_cwd/1,
+        #{
+            <<"type">> => <<"object">>,
+            <<"properties">> => #{
+                <<"path">> => #{
+                    <<"type">> => <<"string">>,
+                    <<"description">> => <<"Relative path to change to">>
+                }
+            },
+            <<"required">> => [<<"path">>]
+        }
+    ).
+
+setup_resources() ->
+    %% Add status resource
+    ok = erlmcp_stdio:add_resource(
+        <<"devout://status">>, 
+        <<"Devout Status">>,
+        fun handle_status_resource/1,
+        <<"text/plain">>
+    ),
+    
+    %% Add help resource
+    ok = erlmcp_stdio:add_resource(
+        <<"devout://help">>, 
+        <<"Devout Help">>,
+        fun handle_help_resource/1,
+        <<"text/plain">>
+    ).
+
+setup_prompts() ->
+    %% Add create_project prompt
+    ok = erlmcp_stdio:add_prompt(
+        <<"create_project">>, 
+        <<"Create a project structure">>,
+        fun handle_create_project_prompt/1,
+        [
+            #{
+                <<"name">> => <<"project_name">>, 
+                <<"description">> => <<"Name of the project">>, 
+                <<"required">> => true
+            },
+            #{
+                <<"name">> => <<"project_type">>, 
+                <<"description">> => <<"Type of project (web, api, library, erlang)">>, 
+                <<"required">> => false
+            }
+        ]
+    ).
+
+%%====================================================================
+%% Tool handlers - Using devout_fs_ops for actual operations
+%%====================================================================
+
+handle_new_dir(#{<<"path">> := Path}) ->
+    case devout_fs_ops:create_directory(Path) of
+        ok ->
+            <<"Directory created successfully: ", Path/binary>>;
+        {error, Reason} ->
+            ReasonBin = format_error(Reason),
+            <<"Error creating directory: ", ReasonBin/binary>>
+    end.
+
+handle_new_dirs(#{<<"path">> := Path} = Args) ->
+    Children = maps:get(<<"children">>, Args, []),
+    
+    %% First create the base directory
+    case devout_fs_ops:create_directory(Path) of
+        ok ->
+            case create_children(Path, Children, []) of
+                {ok, Results} ->
+                    iolist_to_binary([<<"Directory structure created successfully:\n  - ">>, 
+                                      Path, Results]);
+                {error, Reason} ->
+                    ReasonBin = format_error(Reason),
+                    <<"Error creating child directories: ", ReasonBin/binary>>
+            end;
+        {error, Reason} ->
+            ReasonBin = format_error(Reason),
+            <<"Error creating base directory: ", ReasonBin/binary>>
+    end.
+
+create_children(_BasePath, [], Acc) ->
+    {ok, lists:reverse(Acc)};
+create_children(BasePath, [Child | Rest], Acc) ->
+    ChildPath = <<BasePath/binary, "/", Child/binary>>,
+    case devout_fs_ops:create_directory(ChildPath) of
+        ok ->
+            create_children(BasePath, Rest, [<<"\n  - ", Child/binary>> | Acc]);
+        {error, Reason} ->
+            {error, {child_creation_failed, Child, Reason}}
+    end.
+
+handle_move(#{<<"source">> := Source, <<"destination">> := Destination}) ->
+    %% Use path validator to ensure both paths are safe
+    case {devout_path_validator:validate_path(Source), 
+          devout_path_validator:validate_path(Destination)} of
+        {{ok, ValidSource}, {ok, ValidDest}} ->
+            case file:rename(ValidSource, ValidDest) of
+                ok ->
+                    <<"Moved successfully: ", Source/binary, " -> ", Destination/binary>>;
+                {error, Reason} ->
+                    ReasonBin = format_error(Reason),
+                    <<"Error moving file: ", ReasonBin/binary>>
+            end;
+        {{error, SourceErr}, _} ->
+            ReasonBin = format_error(SourceErr),
+            <<"Invalid source path: ", ReasonBin/binary>>;
+        {_, {error, DestErr}} ->
+            ReasonBin = format_error(DestErr),
+            <<"Invalid destination path: ", ReasonBin/binary>>
+    end.
+
+handle_write(#{<<"path">> := Path, <<"content">> := Content} = Args) ->
+    Mode = maps:get(<<"mode">>, Args, <<"write">>),
+    
+    %% Check file size limit
+    {ok, MaxSize} = application:get_env(devout, max_file_size),
+    case byte_size(Content) > MaxSize of
+        true ->
+            MaxSizeBin = integer_to_binary(MaxSize),
+            <<"Error: Content exceeds maximum file size (", MaxSizeBin/binary, " bytes)">>;
+        false ->
+            case devout_fs_ops:create_file(Path, Content) of
+                ok when Mode =:= <<"append">> ->
+                    % Handle append mode by reading existing content first
+                    handle_append_write(Path, Content);
+                ok ->
+                    Size = byte_size(Content),
+                    SizeBin = integer_to_binary(Size),
+                    <<"Content written to file successfully: ", Path/binary, 
+                      " (", SizeBin/binary, " bytes)">>;
+                {error, Reason} ->
+                    ReasonBin = format_error(Reason),
+                    <<"Error writing file: ", ReasonBin/binary>>
+            end
+    end.
+
+handle_append_write(Path, Content) ->
+    case devout_path_validator:validate_path(Path) of
+        {ok, ValidPath} ->
+            case file:write_file(ValidPath, Content, [append]) of
+                ok ->
+                    Size = byte_size(Content),
+                    SizeBin = integer_to_binary(Size),
+                    <<"Content appended to file successfully: ", Path/binary, 
+                      " (", SizeBin/binary, " bytes)">>;
+                {error, Reason} ->
+                    ReasonBin = format_error(Reason),
+                    <<"Error appending to file: ", ReasonBin/binary>>
+            end;
+        {error, Reason} ->
+            ReasonBin = format_error(Reason),
+            <<"Invalid path for append: ", ReasonBin/binary>>
+    end.
+
+handle_read(#{<<"path">> := Path}) ->
+    case devout_path_validator:validate_path(Path) of
+        {ok, ValidPath} ->
+            case file:read_file(ValidPath) of
+                {ok, Content} ->
+                    Size = byte_size(Content),
+                    SizeBin = integer_to_binary(Size),
+                    case Content of
+                        <<>> ->
+                            <<"File is empty: ", Path/binary>>;
+                        _ ->
+                            <<"Content of ", Path/binary, " (", SizeBin/binary, " bytes):\n\n", Content/binary>>
+                    end;
+                {error, enoent} ->
+                    <<"Error: File does not exist: ", Path/binary>>;
+                {error, eisdir} ->
+                    <<"Error: Path is a directory, not a file: ", Path/binary>>;
+                {error, eacces} ->
+                    <<"Error: Permission denied reading file: ", Path/binary>>;
+                {error, Reason} ->
+                    ReasonBin = format_error(Reason),
+                    <<"Error reading file: ", ReasonBin/binary>>
+            end;
+        {error, Reason} ->
+            ReasonBin = format_error(Reason),
+            <<"Invalid path: ", ReasonBin/binary>>
+    end.
+
+handle_show_cwd(_Args) ->
+    case devout_fs_ops:show_cwd() of
+        {ok, Cwd} ->
+            CwdBin = list_to_binary(Cwd),
+            <<"Current working directory: ", CwdBin/binary>>;
+        {error, Reason} ->
+            ReasonBin = format_error(Reason),
+            <<"Error getting current directory: ", ReasonBin/binary>>
+    end.
+
 handle_change_cwd(#{<<"path">> := Path}) ->
     case devout_fs_ops:change_cwd(Path) of
         {ok, NewCwd} ->
-            jsx:encode(#{status => success, new_cwd => list_to_binary(NewCwd)});
+            NewCwdBin = list_to_binary(NewCwd),
+            <<"Changed working directory to: ", NewCwdBin/binary>>;
         {error, Reason} ->
-            jsx:encode(#{status => error, reason => format_error(Reason)})
+            ReasonBin = format_error(Reason),
+            <<"Error changing directory: ", ReasonBin/binary>>
     end.
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Handle create_file tool call
-%% @end
-%%--------------------------------------------------------------------
--spec handle_create_file(Args) -> binary() when
-    Args :: map().
-handle_create_file(#{<<"path">> := Path} = Args) ->
-    Content = maps:get(<<"content">>, Args, <<>>),
-    case devout_fs_ops:create_file(Path, Content) of
-        ok ->
-            jsx:encode(#{status => success, message => <<"File created successfully">>});
-        {error, Reason} ->
-            jsx:encode(#{status => error, reason => format_error(Reason)})
-    end.
+%%====================================================================
+%% Resource handlers
+%%====================================================================
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Handle delete_file tool call
-%% @end
-%%--------------------------------------------------------------------
--spec handle_delete_file(Args) -> binary() when
-    Args :: map().
-handle_delete_file(#{<<"path">> := Path}) ->
-    case devout_fs_ops:delete_file(Path) of
-        ok ->
-            jsx:encode(#{status => success, message => <<"File deleted successfully">>});
-        {error, Reason} ->
-            jsx:encode(#{status => error, reason => format_error(Reason)})
-    end.
+handle_status_resource(_Uri) ->
+    {ok, Cwd} = file:get_cwd(),
+    CwdBin = list_to_binary(Cwd),
+    {ok, AllowedOps} = application:get_env(devout, allowed_operations),
+    OpsList = string:join([atom_to_list(Op) || Op <- AllowedOps], ", "),
+    OpsListBin = list_to_binary(OpsList),
+    
+    <<"Devout MCP Service Status\n\n"
+      "Current working directory: ", CwdBin/binary, "\n"
+      "Service: Active\n"
+      "Allowed operations: ", OpsListBin/binary, "\n"
+      "Security: Path validation enabled\n">>.
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Handle create_directory tool call
-%% @end
-%%--------------------------------------------------------------------
--spec handle_create_directory(Args) -> binary() when
-    Args :: map().
-handle_create_directory(#{<<"path">> := Path}) ->
-    case devout_fs_ops:create_directory(Path) of
-        ok ->
-            jsx:encode(#{status => success, message => <<"Directory created successfully">>});
-        {error, Reason} ->
-            jsx:encode(#{status => error, reason => format_error(Reason)})
-    end.
+handle_help_resource(_Uri) ->
+    <<"Devout MCP Service Help\n\n"
+      "Available Tools:\n"
+      "- new-dir: Create a new directory\n"
+      "  Usage: {\"path\": \"relative/path\"}\n\n"
+      "- new-dirs: Create a directory with children\n"
+      "  Usage: {\"path\": \"base/path\", \"children\": [\"dir1\", \"dir2\"]}\n\n"
+      "- move: Move or rename a file or directory\n"
+      "  Usage: {\"source\": \"old/path\", \"destination\": \"new/path\"}\n\n"
+      "- write: Create or write to a file\n"
+      "  Usage: {\"path\": \"file.txt\", \"content\": \"data\", \"mode\": \"write|append\"}\n\n"
+      "- read: Read a file\n"
+      "  Usage: {\"path\": \"file.txt\"}\n\n"
+      "- show-cwd: Show current working directory\n"
+      "  Usage: {}\n\n"
+      "- change-cwd: Change current working directory\n"
+      "  Usage: {\"path\": \"relative/path\"}\n\n"
+      "Security Features:\n"
+      "- All paths must be relative\n"
+      "- Path traversal attacks prevented\n"
+      "- Operations restricted to base directory\n"
+      "- File size limits enforced\n">>.
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Handle remove_directory tool call
-%% @end
-%%--------------------------------------------------------------------
--spec handle_remove_directory(Args) -> binary() when
-    Args :: map().
-handle_remove_directory(#{<<"path">> := Path} = Args) ->
-    Recursive = maps:get(<<"recursive">>, Args, false),
-    case devout_fs_ops:remove_directory(Path, Recursive) of
-        ok ->
-            jsx:encode(#{status => success, message => <<"Directory removed successfully">>});
-        {error, Reason} ->
-            jsx:encode(#{status => error, reason => format_error(Reason)})
-    end.
+%%====================================================================
+%% Prompt handlers
+%%====================================================================
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Format error for JSON response
-%% @end
-%%--------------------------------------------------------------------
--spec format_error(Reason) -> binary() when
-    Reason :: term().
+handle_create_project_prompt(Args) ->
+    ProjectName = maps:get(<<"project_name">>, Args, <<"my_project">>),
+    ProjectType = maps:get(<<"project_type">>, Args, <<"web">>),
+    
+    {Instructions, Dirs} = case ProjectType of
+        <<"erlang">> ->
+            {<<"Create an Erlang/OTP project structure">>,
+             [<<"src">>, <<"include">>, <<"test">>, <<"priv">>, <<"rebar.config">>]};
+        <<"web">> ->
+            {<<"Create a web project structure">>,
+             [<<"src">>, <<"static">>, <<"templates">>, <<"config">>, <<"tests">>]};
+        <<"api">> ->
+            {<<"Create an API project structure">>,
+             [<<"src">>, <<"tests">>, <<"docs">>, <<"config">>, <<"schemas">>]};
+        <<"library">> ->
+            {<<"Create a library project structure">>,
+             [<<"src">>, <<"tests">>, <<"docs">>, <<"examples">>, <<"benchmarks">>]};
+        _ ->
+            {<<"Create a basic project structure">>,
+             [<<"src">>, <<"tests">>, <<"docs">>]}
+    end,
+    
+    DirsText = string:join([binary_to_list(D) || D <- Dirs], ", "),
+    DirsTextBin = list_to_binary(DirsText),
+    
+    [#{
+        <<"role">> => <<"user">>,
+        <<"content">> => #{
+            <<"type">> => <<"text">>,
+            <<"text">> => <<"Create a project structure for '", ProjectName/binary,
+                            "' (", ProjectType/binary, " project). ", Instructions/binary,
+                            " with directories: ", DirsTextBin/binary,
+                            ". Use the devout tools to create the necessary directories and files.">>
+        }
+    }].
+
+%%====================================================================
+%% Utility functions
+%%====================================================================
+
 format_error(Reason) when is_atom(Reason) ->
     atom_to_binary(Reason, utf8);
 format_error(Reason) when is_list(Reason) ->
     list_to_binary(Reason);
 format_error(Reason) when is_binary(Reason) ->
     Reason;
+format_error({child_creation_failed, Child, SubReason}) ->
+    ChildBin = ensure_binary(Child),
+    SubReasonBin = format_error(SubReason),
+    <<"Failed to create child directory ", ChildBin/binary, ": ", SubReasonBin/binary>>;
 format_error(Reason) ->
     list_to_binary(io_lib:format("~p", [Reason])).
+
+ensure_binary(B) when is_binary(B) -> B;
+ensure_binary(L) when is_list(L) -> list_to_binary(L);
+ensure_binary(A) when is_atom(A) -> atom_to_binary(A, utf8);
+ensure_binary(Other) -> list_to_binary(io_lib:format("~p", [Other])).
