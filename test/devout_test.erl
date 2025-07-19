@@ -36,16 +36,23 @@ setup() ->
     % Suppress info logs during tests
     logger:set_primary_config(level, error),
     
+    % Save the original working directory
+    {ok, OriginalCwd} = file:get_cwd(),
+    
     % Create a temporary directory for testing
     TestDir = "/tmp/devout_test_" ++ integer_to_list(erlang:system_time()),
     file:make_dir(TestDir),
     
-    % Start the application with test configuration
-    application:set_env(devout, base_directory, TestDir),
-    application:set_env(devout, max_file_size, 1024),  % 1KB for tests
+    % Change to the test directory BEFORE starting the application
+    ok = file:set_cwd(TestDir),
     
     % Stop the application if it's already running
     application:stop(devout),
+    
+    % Set the application environment BEFORE starting
+    % This will be picked up by devout_app:start/2
+    application:set_env(devout, base_directory, TestDir),
+    application:set_env(devout, max_file_size, 1024),  % 1KB for tests
     
     % Start required applications
     application:ensure_all_started(crypto),
@@ -57,16 +64,22 @@ setup() ->
     case application:ensure_all_started(devout) of
         {ok, Started} -> 
             ?debugFmt("Started applications: ~p", [Started]),
+            ?debugFmt("Test directory: ~s", [TestDir]),
+            ?debugFmt("Current working directory: ~s", [element(2, file:get_cwd())]),
             ok;
         {error, Reason} -> 
             error({failed_to_start_devout, Reason})
     end,
     
-    TestDir.
+    % Return both the test dir and original cwd for cleanup
+    {TestDir, OriginalCwd}.
 
-cleanup(TestDir) ->
+cleanup({TestDir, OriginalCwd}) ->
     % Stop the application
     application:stop(devout),
+    
+    % Change back to the original directory first
+    file:set_cwd(OriginalCwd),
     
     % Clean up test directory recursively
     case file:list_dir(TestDir) of
@@ -129,60 +142,52 @@ test_path_validation() ->
     ?assertEqual("test/file.txt", devout_path_validator:normalize_path("test//file.txt")).
 
 test_file_operations() ->
-    TestDir = setup(),
-    try
-        % Test file creation
-        FilePath = "test_file.txt",
-        ?assertEqual(ok, devout_fs_ops:create_file(FilePath, <<"Hello, World!">>)),
-        
-        % Verify file exists and has correct content
-        ?assertMatch({ok, _}, devout_path_validator:validate_path(FilePath)),
-        {ok, ValidPath} = devout_path_validator:validate_path(FilePath),
-        ?assert(filelib:is_regular(ValidPath)),
-        ?assertEqual({ok, <<"Hello, World!">>}, file:read_file(ValidPath)),
-        
-        % Test file deletion
-        ?assertEqual(ok, devout_fs_ops:delete_file(FilePath)),
-        ?assertNot(filelib:is_regular(ValidPath)),
-        
-        % Create a test file
-        NestedPath = "subdir/nested_file.txt",
-        ?assertEqual(ok, devout_fs_ops:create_file(NestedPath, <<"Nested content">>)),
-        ?assertMatch({ok, _}, devout_path_validator:validate_path(NestedPath)),
-        {ok, ValidNested} = devout_path_validator:validate_path(NestedPath),
-        ?assert(filelib:is_regular(ValidNested))
-    after
-        cleanup(TestDir)
-    end.
+    % File operations are tested within the test directory set up by the main setup
+    % Test file creation
+    FilePath = "test_file.txt",
+    ?assertEqual(ok, devout_fs_ops:create_file(FilePath, <<"Hello, World!">>)),
+    
+    % Verify file exists and has correct content
+    ?assertMatch({ok, _}, devout_path_validator:validate_path(FilePath)),
+    {ok, ValidPath} = devout_path_validator:validate_path(FilePath),
+    ?assert(filelib:is_regular(ValidPath)),
+    ?assertEqual({ok, <<"Hello, World!">>}, file:read_file(ValidPath)),
+    
+    % Test file deletion
+    ?assertEqual(ok, devout_fs_ops:delete_file(FilePath)),
+    ?assertNot(filelib:is_regular(ValidPath)),
+    
+    % Create a test file
+    NestedPath = "subdir/nested_file.txt",
+    ?assertEqual(ok, devout_fs_ops:create_file(NestedPath, <<"Nested content">>)),
+    ?assertMatch({ok, _}, devout_path_validator:validate_path(NestedPath)),
+    {ok, ValidNested} = devout_path_validator:validate_path(NestedPath),
+    ?assert(filelib:is_regular(ValidNested)).
 
 test_directory_operations() ->
-    TestDir = setup(),
-    try
-        % Test directory creation
-        DirPath = "test_directory",
-        ?assertEqual(ok, devout_fs_ops:create_directory(DirPath)),
-        
-        ?assertMatch({ok, _}, devout_path_validator:validate_path(DirPath)),
-        {ok, ValidDir} = devout_path_validator:validate_path(DirPath),
-        ?assert(filelib:is_dir(ValidDir)),
-        
-        % Test nested directory creation
-        NestedDir = "parent/child/grandchild",
-        ?assertEqual(ok, devout_fs_ops:create_directory(NestedDir)),
-        ?assertMatch({ok, _}, devout_path_validator:validate_path(NestedDir)),
-        {ok, ValidNested} = devout_path_validator:validate_path(NestedDir),
-        ?assert(filelib:is_dir(ValidNested)),
-        
-        % Test directory removal (non-recursive)
-        EmptyDir = "empty_dir",
-        ?assertEqual(ok, devout_fs_ops:create_directory(EmptyDir)),
-        ?assertEqual(ok, devout_fs_ops:remove_directory(EmptyDir, false)),
-        ?assertMatch({ok, _}, devout_path_validator:validate_path(EmptyDir)),
-        {ok, ValidEmpty} = devout_path_validator:validate_path(EmptyDir),
-        ?assertNot(filelib:is_dir(ValidEmpty))
-    after
-        cleanup(TestDir)
-    end.
+    % Directory operations are tested within the test directory set up by the main setup
+    % Test directory creation
+    DirPath = "test_directory",
+    ?assertEqual(ok, devout_fs_ops:create_directory(DirPath)),
+    
+    ?assertMatch({ok, _}, devout_path_validator:validate_path(DirPath)),
+    {ok, ValidDir} = devout_path_validator:validate_path(DirPath),
+    ?assert(filelib:is_dir(ValidDir)),
+    
+    % Test nested directory creation
+    NestedDir = "parent/child/grandchild",
+    ?assertEqual(ok, devout_fs_ops:create_directory(NestedDir)),
+    ?assertMatch({ok, _}, devout_path_validator:validate_path(NestedDir)),
+    {ok, ValidNested} = devout_path_validator:validate_path(NestedDir),
+    ?assert(filelib:is_dir(ValidNested)),
+    
+    % Test directory removal (non-recursive)
+    EmptyDir = "empty_dir",
+    ?assertEqual(ok, devout_fs_ops:create_directory(EmptyDir)),
+    ?assertEqual(ok, devout_fs_ops:remove_directory(EmptyDir, false)),
+    ?assertMatch({ok, _}, devout_path_validator:validate_path(EmptyDir)),
+    {ok, ValidEmpty} = devout_path_validator:validate_path(EmptyDir),
+    ?assertNot(filelib:is_dir(ValidEmpty)).
 
 test_security_features() ->
     % Test file size limits

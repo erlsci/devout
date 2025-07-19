@@ -31,13 +31,17 @@
     Reason :: term().
 start(_StartType, _StartArgs) ->
     ?LOG_INFO("Starting Devout MCP server application"),
-    
-    % Set the base directory to current working directory
-    {ok, Cwd} = file:get_cwd(),
-    application:set_env(devout, base_directory, Cwd),
-    
-    ?LOG_INFO("Base directory set to: ~s", [Cwd]),
-    
+
+    % Set the base directory to current working directory if not already set
+    case application:get_env(devout, base_directory) of
+        undefined ->
+            {ok, Cwd} = file:get_cwd(),
+            application:set_env(devout, base_directory, Cwd),
+            ?LOG_INFO("Base directory set to: ~s", [Cwd]);
+        {ok, ExistingDir} ->
+            ?LOG_INFO("Using existing base directory: ~s", [ExistingDir])
+    end,
+
     case devout_sup:start_link() of
         {ok, Pid} ->
             ?LOG_INFO("Devout supervisor started successfully"),
