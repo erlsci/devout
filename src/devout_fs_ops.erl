@@ -28,8 +28,7 @@
 %% Show current working directory
 %% @end
 %%--------------------------------------------------------------------
--spec show_cwd() -> {ok, string()} | {error, Reason} when
-    Reason :: term().
+-spec show_cwd() -> {ok, string()} | {error, atom()}.
 show_cwd() ->
     case file:get_cwd() of
         {ok, Cwd} ->
@@ -45,9 +44,8 @@ show_cwd() ->
 %% Change current working directory to a relative path
 %% @end
 %%--------------------------------------------------------------------
--spec change_cwd(Path) -> {ok, string()} | {error, Reason} when
-    Path :: string() | binary(),
-    Reason :: term().
+-spec change_cwd(Path) -> {ok, string()} | {error, atom()} when
+    Path :: string() | binary().
 change_cwd(Path) ->
     case devout_path_validator:validate_path(Path) of
         {ok, ValidatedPath} ->
@@ -70,9 +68,8 @@ change_cwd(Path) ->
 %% Create a file with empty content
 %% @end
 %%--------------------------------------------------------------------
--spec create_file(Path) -> ok | {error, Reason} when
-    Path :: string() | binary(),
-    Reason :: term().
+-spec create_file(Path) -> ok | {error, atom()} when
+    Path :: string() | binary().
 create_file(Path) ->
     create_file(Path, <<>>).
 
@@ -81,10 +78,9 @@ create_file(Path) ->
 %% Create a file with specified content
 %% @end
 %%--------------------------------------------------------------------
--spec create_file(Path, Content) -> ok | {error, Reason} when
+-spec create_file(Path, Content) -> ok | {error, atom()} when
     Path :: string() | binary(),
-    Content :: binary() | string(),
-    Reason :: term().
+    Content :: binary() | string().
 create_file(Path, Content) ->
     case devout_path_validator:validate_path(Path) of
         {ok, ValidatedPath} ->
@@ -115,9 +111,8 @@ create_file(Path, Content) ->
 %% Delete a file
 %% @end
 %%--------------------------------------------------------------------
--spec delete_file(Path) -> ok | {error, Reason} when
-    Path :: string() | binary(),
-    Reason :: term().
+-spec delete_file(Path) -> ok | {error, atom()} when
+    Path :: string() | binary().
 delete_file(Path) ->
     case devout_path_validator:validate_path(Path) of
         {ok, ValidatedPath} ->
@@ -139,9 +134,8 @@ delete_file(Path) ->
 %% Create a directory and all necessary parent directories
 %% @end
 %%--------------------------------------------------------------------
--spec create_directory(Path) -> ok | {error, Reason} when
-    Path :: string() | binary(),
-    Reason :: term().
+-spec create_directory(Path) -> ok | {error, atom()} when
+    Path :: string() | binary().
 create_directory(Path) ->
     case devout_path_validator:validate_path(Path) of
         {ok, ValidatedPath} ->
@@ -172,9 +166,8 @@ create_directory(Path) ->
 %% Remove a directory (only if empty)
 %% @end
 %%--------------------------------------------------------------------
--spec remove_directory(Path) -> ok | {error, Reason} when
-    Path :: string() | binary(),
-    Reason :: term().
+-spec remove_directory(Path) -> ok | {error, atom()} when
+    Path :: string() | binary().
 remove_directory(Path) ->
     remove_directory(Path, false).
 
@@ -183,10 +176,9 @@ remove_directory(Path) ->
 %% Remove a directory, optionally removing all contents recursively
 %% @end
 %%--------------------------------------------------------------------
--spec remove_directory(Path, Recursive) -> ok | {error, Reason} when
+-spec remove_directory(Path, Recursive) -> ok | {error, atom() | {no_translation, binary()}} when
     Path :: string() | binary(),
-    Recursive :: boolean(),
-    Reason :: term().
+    Recursive :: boolean().
 remove_directory(Path, Recursive) ->
     case devout_path_validator:validate_path(Path) of
         {ok, ValidatedPath} ->
@@ -217,9 +209,8 @@ remove_directory(Path, Recursive) ->
 %% Ensure a directory exists, creating it if necessary
 %% @end
 %%--------------------------------------------------------------------
--spec ensure_directory_exists(Path) -> ok | {error, Reason} when
-    Path :: string(),
-    Reason :: term().
+-spec ensure_directory_exists(Path) -> ok | {error, atom()} when
+    Path :: string().
 ensure_directory_exists(Path) ->
     case filelib:is_dir(Path) of
         true ->
@@ -250,9 +241,8 @@ ensure_binary(Content) when is_list(Content) ->
 %% Remove directory recursively
 %% @end
 %%--------------------------------------------------------------------
--spec remove_directory_recursive(Path) -> ok | {error, Reason} when
-    Path :: string(),
-    Reason :: term().
+-spec remove_directory_recursive(Path) -> ok | {error, atom()} when
+    Path :: string().
 remove_directory_recursive(Path) ->
     case file:list_dir(Path) of
         {ok, Files} ->
@@ -279,10 +269,9 @@ remove_directory_recursive(Path) ->
 %% Remove all contents of a directory
 %% @end
 %%--------------------------------------------------------------------
--spec remove_directory_contents(Path, Files) -> ok | {error, Reason} when
+-spec remove_directory_contents(Path, Files) -> ok | {error, atom()} when
     Path :: string(),
-    Files :: [string()],
-    Reason :: term().
+    Files :: [string()].
 remove_directory_contents(_Path, []) ->
     ok;
 remove_directory_contents(Path, [File | Rest]) ->

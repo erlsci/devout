@@ -41,6 +41,7 @@ stop() ->
 %% gen_server callbacks
 %%====================================================================
 
+-spec init([]) -> {ok, state()}.
 init([]) ->
     process_flag(trap_exit, true),
     ?LOG_INFO("Initializing Devout MCP server"),
@@ -57,6 +58,8 @@ init([]) ->
     ?LOG_INFO("Devout MCP server initialized with base directory: ~s", [BaseDir]),
     {ok, State}.
 
+-spec handle_call(term(), {pid(), term()}, state()) -> 
+    {reply, term(), state()} | {stop, normal, ok, state()}.
 handle_call(start_stdio, _From, #state{stdio_started = false} = State) ->
     case setup_stdio_server() of
         ok ->
@@ -76,16 +79,20 @@ handle_call(stop, _From, State) ->
 handle_call(_Request, _From, State) ->
     {reply, {error, unknown_request}, State}.
 
+-spec handle_cast(term(), state()) -> {noreply, state()}.
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+-spec handle_info(term(), state()) -> {noreply, state()}.
 handle_info(_Info, State) ->
     {noreply, State}.
 
+-spec terminate(term(), state()) -> ok.
 terminate(_Reason, _State) ->
     ?LOG_INFO("Devout MCP server terminating"),
     ok.
 
+-spec code_change(term(), state(), term()) -> {ok, state()}.
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
@@ -513,20 +520,11 @@ handle_create_project_prompt(Args) ->
 %% Utility functions
 %%====================================================================
 
-format_error(Reason) when is_atom(Reason) ->
-    atom_to_binary(Reason, utf8);
-format_error(Reason) when is_list(Reason) ->
-    list_to_binary(Reason);
-format_error(Reason) when is_binary(Reason) ->
-    Reason;
 format_error({child_creation_failed, Child, SubReason}) ->
     ChildBin = ensure_binary(Child),
     SubReasonBin = format_error(SubReason),
     <<"Failed to create child directory ", ChildBin/binary, ": ", SubReasonBin/binary>>;
-format_error(Reason) ->
-    list_to_binary(io_lib:format("~p", [Reason])).
+format_error(Reason) when is_atom(Reason) ->
+    atom_to_binary(Reason, utf8).
 
-ensure_binary(B) when is_binary(B) -> B;
-ensure_binary(L) when is_list(L) -> list_to_binary(L);
-ensure_binary(A) when is_atom(A) -> atom_to_binary(A, utf8);
-ensure_binary(Other) -> list_to_binary(io_lib:format("~p", [Other])).
+ensure_binary(B) when is_binary(B) -> B.

@@ -17,6 +17,8 @@
 
 -include_lib("kernel/include/logger.hrl").
 
+-type path_error() :: absolute_path_not_allowed | parent_traversal_not_allowed | path_outside_base_directory.
+
 %%====================================================================
 %% API
 %%====================================================================
@@ -26,9 +28,8 @@
 %% Validate a path is relative and safe
 %% @end
 %%--------------------------------------------------------------------
--spec validate_path(Path) -> {ok, string()} | {error, Reason} when
-    Path :: string() | binary(),
-    Reason :: atom().
+-spec validate_path(Path) -> {ok, string()} | {error, path_error()} when
+    Path :: string() | binary().
 validate_path(Path) ->
     {ok, BaseDir} = application:get_env(devout, base_directory),
     validate_path(Path, BaseDir).
@@ -38,10 +39,9 @@ validate_path(Path) ->
 %% Validate a path is relative and safe with custom base directory
 %% @end
 %%--------------------------------------------------------------------
--spec validate_path(Path, BaseDir) -> {ok, string()} | {error, Reason} when
+-spec validate_path(Path, BaseDir) -> {ok, string()} | {error, path_error()} when
     Path :: string() | binary(),
-    BaseDir :: string(),
-    Reason :: atom().
+    BaseDir :: string().
 validate_path(Path, BaseDir) when is_binary(Path) ->
     validate_path(binary_to_list(Path), BaseDir);
 validate_path(Path, BaseDir) when is_list(Path) ->
@@ -72,9 +72,8 @@ validate_path(Path, BaseDir) when is_list(Path) ->
 %% Resolve a path relative to the base directory
 %% @end
 %%--------------------------------------------------------------------
--spec resolve_path(Path) -> {ok, string()} | {error, Reason} when
-    Path :: string() | binary(),
-    Reason :: atom().
+-spec resolve_path(Path) -> {ok, string()} | {error, path_error()} when
+    Path :: string() | binary().
 resolve_path(Path) ->
     {ok, BaseDir} = application:get_env(devout, base_directory),
     resolve_path(Path, BaseDir).
@@ -84,10 +83,9 @@ resolve_path(Path) ->
 %% Resolve a path relative to a custom base directory
 %% @end
 %%--------------------------------------------------------------------
--spec resolve_path(Path, BaseDir) -> {ok, string()} | {error, Reason} when
+-spec resolve_path(Path, BaseDir) -> {ok, string()} | {error, path_error()} when
     Path :: string() | binary(),
-    BaseDir :: string(),
-    Reason :: atom().
+    BaseDir :: string().
 resolve_path(Path, BaseDir) ->
     case validate_path(Path, BaseDir) of
         {ok, ValidatedPath} ->
@@ -119,7 +117,7 @@ is_relative_path(Path) when is_list(Path) ->
 %% Normalize a path by removing redundant separators and dots
 %% @end
 %%--------------------------------------------------------------------
--spec normalize_path(Path) -> string() when
+-spec normalize_path(Path) -> string() | binary() when
     Path :: string().
 normalize_path(Path) ->
     % Split path into components
@@ -132,7 +130,10 @@ normalize_path(Path) ->
         Components
     ),
     % Join back together
-    filename:join(FilteredComponents).
+    case FilteredComponents of
+        [] -> ".";
+        _ -> filename:join(FilteredComponents)
+    end.
 
 %%====================================================================
 %% Internal functions

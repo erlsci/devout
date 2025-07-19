@@ -1,6 +1,7 @@
 %%%-------------------------------------------------------------------
 %%% @doc
-%%% Devout stdio main entry point - Starts the application and stdio server
+%%% Devout main entry point - Starts the application and stdio server
+%%% (This was originally devout_stdio_main.erl)
 %%% @end
 %%%-------------------------------------------------------------------
 -module(devout).
@@ -13,25 +14,25 @@
 %%====================================================================
 
 start() ->
-    main([]).
+    start([]).
 
 start(_Args) ->
     %% Start the devout application
     case application:ensure_all_started(devout) of
         {ok, _Started} ->
             ?LOG_INFO("Successfully started devout application");
-        {error, Reason} ->
-            ?LOG_ERROR("Failed to start devout application: ~p", [Reason]),
+        {error, AppReason} ->
+            ?LOG_ERROR("Failed to start devout application: ~p", [AppReason]),
             halt(1)
     end,
 
     %% Configure logging to stderr (so it doesn't interfere with stdio MCP protocol)
-    logger:remove_handler(default),
-    logger:add_handler(stderr_handler, logger_std_h, #{
+    ok = logger:remove_handler(default),
+    ok = logger:add_handler(stderr_handler, logger_std_h, #{
         level => info,
         config => #{type => standard_error}
     }),
-    logger:set_primary_config(level, info),
+    ok = logger:set_primary_config(level, info),
 
     ?LOG_INFO("Starting Devout MCP server..."),
 
@@ -40,8 +41,8 @@ start(_Args) ->
         ok ->
             ?LOG_INFO("Devout MCP server started successfully"),
             wait_for_shutdown();
-        {error, Reason} ->
-            ?LOG_ERROR("Failed to start Devout MCP server: ~p", [Reason]),
+        {error, ServerReason} ->
+            ?LOG_ERROR("Failed to start Devout MCP server: ~p", [ServerReason]),
             halt(1)
     end.
 

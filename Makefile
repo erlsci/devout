@@ -1,6 +1,6 @@
 # Makefile for Devout MCP Server
 
-.PHONY: all build clean deps test dialyzer xref shell release start stop check format
+.PHONY: all build clean deps test dialyzer dialyzer-full plt xref shell release start stop check format
 
 # Default target
 all: build
@@ -9,6 +9,12 @@ all: build
 build: deps
 	@echo "Building Devout MCP Server..."
 	@rebar3 compile
+
+# Build with debug_info for Dialyzer compatibility
+build-debug: deps
+	@echo "Building Devout MCP Server with debug_info..."
+	@rm -rf _build/default/lib/erlmcp/ebin
+	@ERL_COMPILER_OPTIONS="[debug_info]" rebar3 compile
 
 # Clean build artifacts
 clean:
@@ -26,9 +32,14 @@ test:
 	@rebar3 eunit
 	@rebar3 ct
 
-# Run dialyzer for type checking
+# Run dialyzer for type checking (uses existing PLT)
 dialyzer:
 	@echo "Running dialyzer..."
+	@rebar3 dialyzer
+
+# Full Dialyzer run (rebuild with debug_info + PLT + analysis)
+dialyzer-full: build-debug
+	@echo "Running full Dialyzer analysis..."
 	@rebar3 dialyzer
 
 # Run xref for cross-reference analysis
@@ -61,8 +72,8 @@ stop:
 	@echo "Stopping Devout MCP Server..."
 	@pkill -f "devout"
 
-# Run all checks
-check: dialyzer xref test
+# Run all checks (now includes full Dialyzer)
+check: dialyzer-full xref test
 	@echo "All checks passed!"
 
 # Format code (requires rebar3_format plugin)
@@ -74,6 +85,10 @@ format:
 dev: build
 	@echo "Starting development environment..."
 	@rebar3 shell --config config/sys.config
+
+# Development workflow with type checking
+dev-full: clean build-debug dialyzer-full test
+	@echo "Full development workflow completed!"
 
 # Watch for changes and rebuild (requires rebar3_auto plugin)
 watch:
@@ -111,19 +126,23 @@ help:
 	@echo "Available targets:"
 	@echo "  all         - Build the project (default)"
 	@echo "  build       - Compile the project"
+	@echo "  build-debug - Compile with debug_info for Dialyzer"
 	@echo "  clean       - Clean build artifacts"
 	@echo "  deps        - Get dependencies"
 	@echo "  test        - Run tests"
-	@echo "  dialyzer    - Run type checking"
+	@echo "  plt         - Build Dialyzer PLT (with debug_info)"
+	@echo "  dialyzer    - Run type checking (uses existing PLT)"
+	@echo "  dialyzer-full - Full Dialyzer run (rebuild + PLT + analysis)"
 	@echo "  xref        - Run cross-reference analysis"
 	@echo "  shell       - Start development shell"
 	@echo "  release     - Create release"
 	@echo "  start       - Start development server"
 	@echo "  start-mcp   - Start server in MCP stdio mode"
 	@echo "  stop        - Stop server"
-	@echo "  check       - Run all checks"
+	@echo "  check       - Run all checks (includes full Dialyzer)"
 	@echo "  format      - Format code"
 	@echo "  dev         - Start development environment"
+	@echo "  dev-full    - Full development workflow with type checking"
 	@echo "  watch       - Watch for changes and rebuild"
 	@echo "  docs        - Generate documentation"
 	@echo "  package     - Package for distribution"

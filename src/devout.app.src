@@ -40,7 +40,7 @@
         devout_server,
         devout_fs_ops,
         devout_path_validator,
-        devout_stdio_main
+        devout
     ]},
     {licenses, ["Apache-2.0"]},
     {links, [

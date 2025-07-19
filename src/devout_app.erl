@@ -25,7 +25,7 @@
 %% top supervisor of the tree.
 %% @end
 %%--------------------------------------------------------------------
--spec start(StartType, StartArgs) -> {ok, pid()} | {error, Reason} when
+-spec start(StartType, StartArgs) -> {ok, pid()} | ignore | {error, Reason} when
     StartType :: normal | {takeover, node()} | {failover, node()},
     StartArgs :: term(),
     Reason :: term().
