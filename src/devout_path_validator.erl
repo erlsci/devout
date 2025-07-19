@@ -15,9 +15,8 @@
     normalize_path/1
 ]).
 
+-include("devout.hrl").
 -include_lib("kernel/include/logger.hrl").
-
--type path_error() :: absolute_path_not_allowed | parent_traversal_not_allowed | path_outside_base_directory.
 
 %%====================================================================
 %% API

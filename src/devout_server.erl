@@ -12,20 +12,18 @@
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
-%% Resource handlers
--export([handle_status_resource/1, handle_help_resource/1]).
+%% Resource and prompt handlers
+-export([
+    handle_status_resource/1, 
+    handle_help_resource/1,
+    handle_create_project_prompt/1
+]).
 
-%% Prompt handlers
--export([handle_create_project_prompt/1]).
-
+-include("devout.hrl").
 -include_lib("kernel/include/logger.hrl").
 -include_lib("kernel/include/file.hrl").
 
--record(state, {
-    base_directory :: string()
-}).
-
--type state() :: #state{}.
+-type state() :: #devout_server_state{}.
 
 %%====================================================================
 %% API functions
@@ -51,7 +49,7 @@ init([]) ->
 
     % Note: We don't register tools here anymore - that happens in the start_phase
 
-    State = #state{base_directory = BaseDir},
+    State = #devout_server_state{base_directory = BaseDir},
 
     ?LOG_INFO("Devout MCP server initialized with base directory: ~s", [BaseDir]),
     {ok, State}.
@@ -76,8 +74,6 @@ terminate(_Reason, _State) ->
 -spec code_change(term(), state(), term()) -> {ok, state()}.
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
-
 
 %%====================================================================
 %% Resource handlers

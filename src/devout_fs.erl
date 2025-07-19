@@ -28,7 +28,9 @@
     handle_list_files/1
 ]).
 
+-include("devout.hrl").
 -include_lib("kernel/include/logger.hrl").
+-include_lib("kernel/include/file.hrl").
 
 %%====================================================================
 %% API
@@ -303,7 +305,7 @@ handle_new_dir(#{<<"path">> := Path}) ->
         ok ->
             <<"Directory created successfully: ", Path/binary>>;
         {error, Reason} ->
-            ReasonBin = devout_fmt:error(Reason),
+            ReasonBin = devout_fmt:err(Reason),
             <<"Error creating directory: ", ReasonBin/binary>>
     end.
 
@@ -318,11 +320,11 @@ handle_new_dirs(#{<<"path">> := Path} = Args) ->
                     iolist_to_binary([<<"Directory structure created successfully:\n  - ">>,
                                       Path, Results]);
                 {error, Reason} ->
-                    ReasonBin = devout_fmt:error(Reason),
+                    ReasonBin = devout_fmt:err(Reason),
                     <<"Error creating child directories: ", ReasonBin/binary>>
             end;
         {error, Reason} ->
-            ReasonBin = devout_fmt:error(Reason),
+            ReasonBin = devout_fmt:err(Reason),
             <<"Error creating base directory: ", ReasonBin/binary>>
     end.
 
@@ -346,14 +348,14 @@ handle_move(#{<<"source">> := Source, <<"destination">> := Destination}) ->
                 ok ->
                     <<"Moved successfully: ", Source/binary, " -> ", Destination/binary>>;
                 {error, Reason} ->
-                    ReasonBin = devout_fmt:error(Reason),
+                    ReasonBin = devout_fmt:err(Reason),
                     <<"Error moving file: ", ReasonBin/binary>>
             end;
         {{error, SourceErr}, _} ->
-            ReasonBin = devout_fmt:error(SourceErr),
+            ReasonBin = devout_fmt:err(SourceErr),
             <<"Invalid source path: ", ReasonBin/binary>>;
         {_, {error, DestErr}} ->
-            ReasonBin = devout_fmt:error(DestErr),
+            ReasonBin = devout_fmt:err(DestErr),
             <<"Invalid destination path: ", ReasonBin/binary>>
     end.
 
@@ -377,7 +379,7 @@ handle_write(#{<<"path">> := Path, <<"content">> := Content} = Args) ->
                     <<"Content written to file successfully: ", Path/binary,
                       " (", SizeBin/binary, " bytes)">>;
                 {error, Reason} ->
-                    ReasonBin = devout_fmt:error(Reason),
+                    ReasonBin = devout_fmt:err(Reason),
                     <<"Error writing file: ", ReasonBin/binary>>
             end
     end.
@@ -392,11 +394,11 @@ handle_append_write(Path, Content) ->
                     <<"Content appended to file successfully: ", Path/binary,
                       " (", SizeBin/binary, " bytes)">>;
                 {error, Reason} ->
-                    ReasonBin = devout_fmt:error(Reason),
+                    ReasonBin = devout_fmt:err(Reason),
                     <<"Error appending to file: ", ReasonBin/binary>>
             end;
         {error, Reason} ->
-            ReasonBin = devout_fmt:error(Reason),
+            ReasonBin = devout_fmt:err(Reason),
             <<"Invalid path for append: ", ReasonBin/binary>>
     end.
 
@@ -420,11 +422,11 @@ handle_read(#{<<"path">> := Path}) ->
                 {error, eacces} ->
                     <<"Error: Permission denied reading file: ", Path/binary>>;
                 {error, Reason} ->
-                    ReasonBin = devout_fmt:error(Reason),
+                    ReasonBin = devout_fmt:err(Reason),
                     <<"Error reading file: ", ReasonBin/binary>>
             end;
         {error, Reason} ->
-            ReasonBin = devout_fmt:error(Reason),
+            ReasonBin = devout_fmt:err(Reason),
             <<"Invalid path: ", ReasonBin/binary>>
     end.
 
@@ -434,7 +436,7 @@ handle_show_cwd(_Args) ->
             CwdBin = list_to_binary(Cwd),
             <<"Current working directory: ", CwdBin/binary>>;
         {error, Reason} ->
-            ReasonBin = devout_fmt:error(Reason),
+            ReasonBin = devout_fmt:err(Reason),
             <<"Error getting current directory: ", ReasonBin/binary>>
     end.
 
@@ -444,7 +446,7 @@ handle_change_cwd(#{<<"path">> := Path}) ->
             NewCwdBin = list_to_binary(NewCwd),
             <<"Changed working directory to: ", NewCwdBin/binary>>;
         {error, Reason} ->
-            ReasonBin = devout_fmt:error(Reason),
+            ReasonBin = devout_fmt:err(Reason),
             <<"Error changing directory: ", ReasonBin/binary>>
     end.
 
@@ -505,10 +507,10 @@ handle_list_files(Args) ->
                 {error, eacces} ->
                     <<"Error: Permission denied accessing directory: ", Path/binary>>;
                 {error, Reason} ->
-                    ReasonBin = devout_fmt:error(Reason),
+                    ReasonBin = devout_fmt:err(Reason),
                     <<"Error listing directory: ", ReasonBin/binary>>
             end;
         {error, Reason} ->
-            ReasonBin = devout_fmt:error(Reason),
+            ReasonBin = devout_fmt:err(Reason),
             <<"Invalid path: ", ReasonBin/binary>>
     end.

@@ -448,7 +448,7 @@ devout_server:start_stdio().
    handle_my_operation(#{<<"path">> := Path}) ->
        case devout_fs:my_operation(Path) of
            ok -> <<"Success message">>;
-           {error, Reason} -> devout_fmt:error(Reason)
+           {error, Reason} -> devout_fmt:err(Reason)
        end.
    ```
 
@@ -467,7 +467,7 @@ devout_server:start_stdio().
    handle_my_git_operation(#{<<"param">> := Value}) ->
        case my_git_operation([binary_to_list(Value)]) of
            {ok, Output} -> <<"Success: ", Output/binary>>;
-           {error, Reason} -> devout_fmt:error(Reason)
+           {error, Reason} -> devout_fmt:err(Reason)
        end.
    ```
 

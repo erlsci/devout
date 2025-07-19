@@ -1,11 +1,11 @@
 %% @doc Git operations module for devout
-%% 
+%%
 %% This module provides MCP tools for common Git operations using erlexec
 %% to execute Git commands safely.
 %%
 %% Supported commands:
 %% - git add <files>
-%% - git log [options]  
+%% - git log [options]
 %% - git diff [ref1] [ref2]
 %% - git pull <remote> <branch> --rebase
 %% - git checkout -b <name>
@@ -31,7 +31,7 @@
     commit_files/2,
     clone/1,
     status/0,
-    
+
     % MCP tool handlers
     handle_git_add/1,
     handle_git_log/1,
@@ -120,7 +120,7 @@ commit_files(Files, Message) when is_binary(Message) ->
     commit_files(Files, binary_to_list(Message));
 commit_files(Files, Message) when is_list(Files), is_list(Message) ->
     FileArgs = [if is_binary(F) -> binary_to_list(F); true -> F end || F <- Files],
-    execute_git(FileArgs ++ ["-m", Message]).
+    execute_git(["commit"] ++ FileArgs ++ ["-m", Message]).
 
 %% @doc Clone a repository
 -spec clone(binary() | string()) -> git_result().
@@ -144,19 +144,19 @@ execute_git(Args) ->
         {stderr, self()},
         monitor
     ],
-    
+
     try
         ?LOG_INFO("Executing git command: ~p ~p", [Cmd, Args]),
         case exec:run([Cmd | Args], Options) of
             {ok, _, OsPid} ->
                 collect_output(OsPid, <<>>, <<>>, Timeout);
-            {error, Reason} ->
-                ?LOG_ERROR("Failed to execute git command: ~p", [Reason]),
-                {error, Reason}
+            {error, ExecReason} ->
+                ?LOG_ERROR("Failed to execute git command: ~p", [ExecReason]),
+                {error, ExecReason}
         end
     catch
         Class:Reason:Stacktrace ->
-            ?LOG_ERROR("Exception executing git command: ~p:~p~n~p", 
+            ?LOG_ERROR("Exception executing git command: ~p:~p~n~p",
                       [Class, Reason, Stacktrace]),
             {error, {exception, Class, Reason}}
     end.
@@ -183,7 +183,7 @@ collect_output(OsPid, StdOut, StdErr, Timeout) ->
     after
         Timeout ->
             ?LOG_ERROR("Git command timed out after ~p ms", [Timeout]),
-            exec:kill(OsPid, 9),
+            _ = exec:kill(OsPid, 9),  % Match the return value to avoid Dialyzer warning
             {error, timeout}
     end.
 
@@ -347,7 +347,7 @@ handle_git_clone(#{<<"url">> := Url}) ->
 handle_git_clone(_) ->
     <<"Error: git clone requires 'url' parameter">>.
 
-%% @doc Handle git status MCP tool  
+%% @doc Handle git status MCP tool
 -spec handle_git_status(map()) -> binary().
 handle_git_status(_) ->
     case status() of

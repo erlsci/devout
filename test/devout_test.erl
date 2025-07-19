@@ -5,6 +5,8 @@
 %%% @end
 %%%-------------------------------------------------------------------
 -module(devout_test).
+
+-include("devout.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/logger.hrl").
 
@@ -59,6 +61,7 @@ setup() ->
     application:ensure_all_started(ssl),
     application:ensure_all_started(lager),
     application:ensure_all_started(jsx),
+    application:ensure_all_started(erlexec),
     application:ensure_all_started(erlmcp),
 
     case application:ensure_all_started(devout) of
@@ -232,31 +235,31 @@ test_tool_handlers() ->
     % Test tool handlers directly (these are the functions called by erlmcp)
 
     % Test new-dir handler
-    NewDirResult = devout_server:handle_new_dir(#{<<"path">> => <<"test_tool_dir">>}),
+    NewDirResult = devout_fs:handle_new_dir(#{<<"path">> => <<"test_tool_dir">>}),
     ?assert(binary:match(NewDirResult, <<"created successfully">>) =/= nomatch),
 
     % Test new-dirs handler
-    NewDirsResult = devout_server:handle_new_dirs(#{<<"path">> => <<"project">>,
-                                                    <<"children">> => [<<"src">>, <<"test">>]}),
+    NewDirsResult = devout_fs:handle_new_dirs(#{<<"path">> => <<"project">>,
+                                                <<"children">> => [<<"src">>, <<"test">>]}),
     ?assert(binary:match(NewDirsResult, <<"structure created">>) =/= nomatch),
 
     % Test write handler
-    WriteResult = devout_server:handle_write(#{<<"path">> => <<"test.txt">>,
-                                               <<"content">> => <<"content">>}),
+    WriteResult = devout_fs:handle_write(#{<<"path">> => <<"test.txt">>,
+                                           <<"content">> => <<"content">>}),
     ?assert(binary:match(WriteResult, <<"written to file successfully">>) =/= nomatch),
 
     % Test read handler
-    ReadResult = devout_server:handle_read(#{<<"path">> => <<"test.txt">>}),
+    ReadResult = devout_fs:handle_read(#{<<"path">> => <<"test.txt">>}),
     ?assert(binary:match(ReadResult, <<"Content of">>) =/= nomatch),
     ?assert(binary:match(ReadResult, <<"content">>) =/= nomatch),
 
     % Test move handler
-    MoveResult = devout_server:handle_move(#{<<"source">> => <<"test.txt">>,
-                                            <<"destination">> => <<"moved_test.txt">>}),
+    MoveResult = devout_fs:handle_move(#{<<"source">> => <<"test.txt">>,
+                                        <<"destination">> => <<"moved_test.txt">>}),
     ?assert(binary:match(MoveResult, <<"Moved successfully">>) =/= nomatch),
 
     % Test show-cwd handler
-    CwdResult = devout_server:handle_show_cwd(#{}),
+    CwdResult = devout_fs:handle_show_cwd(#{}),
     ?assert(binary:match(CwdResult, <<"Current working directory">>) =/= nomatch).
 
 %%====================================================================

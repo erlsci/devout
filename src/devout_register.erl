@@ -4,7 +4,7 @@
 %%% @end
 %%%-------------------------------------------------------------------
 -module(devout_register).
--export([file_tools/0, git_tools/0, resources/0, prompts/0])
+-export([file_tools/0, git_tools/0, resources/0, prompts/0]).
 
 -spec file_tools() -> ok.
 file_tools() ->
@@ -12,7 +12,7 @@ file_tools() ->
     ok = erlmcp_stdio:add_tool(
         <<"new-dir">>,
         <<"Create a new directory">>,
-        fun devout_server:handle_new_dir/1,
+        fun devout_fs:handle_new_dir/1,
         #{
             <<"type">> => <<"object">>,
             <<"properties">> => #{
@@ -29,7 +29,7 @@ file_tools() ->
     ok = erlmcp_stdio:add_tool(
         <<"new-dirs">>,
         <<"Create a directory with child directories">>,
-        fun devout_server:handle_new_dirs/1,
+        fun devout_fs:handle_new_dirs/1,
         #{
             <<"type">> => <<"object">>,
             <<"properties">> => #{
@@ -51,7 +51,7 @@ file_tools() ->
     ok = erlmcp_stdio:add_tool(
         <<"move">>,
         <<"Move or rename a file or directory">>,
-        fun devout_server:handle_move/1,
+        fun devout_fs:handle_move/1,
         #{
             <<"type">> => <<"object">>,
             <<"properties">> => #{
@@ -72,7 +72,7 @@ file_tools() ->
     ok = erlmcp_stdio:add_tool(
         <<"write">>,
         <<"Create or write to a file">>,
-        fun devout_server:handle_write/1,
+        fun devout_fs:handle_write/1,
         #{
             <<"type">> => <<"object">>,
             <<"properties">> => #{
@@ -99,7 +99,7 @@ file_tools() ->
     ok = erlmcp_stdio:add_tool(
         <<"read">>,
         <<"Read a file">>,
-        fun devout_server:handle_read/1,
+        fun devout_fs:handle_read/1,
         #{
             <<"type">> => <<"object">>,
             <<"properties">> => #{
@@ -116,7 +116,7 @@ file_tools() ->
     ok = erlmcp_stdio:add_tool(
         <<"show-cwd">>,
         <<"Show current working directory">>,
-        fun devout_server:handle_show_cwd/1,
+        fun devout_fs:handle_show_cwd/1,
         #{
             <<"type">> => <<"object">>,
             <<"properties">> => #{},
@@ -128,7 +128,7 @@ file_tools() ->
     ok = erlmcp_stdio:add_tool(
         <<"change-cwd">>,
         <<"Change current working directory">>,
-        fun devout_server:handle_change_cwd/1,
+        fun devout_fs:handle_change_cwd/1,
         #{
             <<"type">> => <<"object">>,
             <<"properties">> => #{
@@ -145,7 +145,7 @@ file_tools() ->
     ok = erlmcp_stdio:add_tool(
         <<"list-files">>,
         <<"List files and directories in a path">>,
-        fun devout_server:handle_list_files/1,
+        fun devout_fs:handle_list_files/1,
         #{
             <<"type">> => <<"object">>,
             <<"properties">> => #{
@@ -355,15 +355,19 @@ resources() ->
         <<"devout://status">>,
         <<"Devout server status and configuration">>,
         fun(_Uri) ->
+            {ok, Cwd} = file:get_cwd(),
             Status = #{
-                status => running,
-                base_dir => list_to_binary(element(2, file:get_cwd())),
-                config => #{
-                    max_file_size => application:get_env(devout, max_file_size, 10485760),
-                    allowed_extensions => application:get_env(devout, allowed_extensions, all)
+                <<"status">> => <<"running">>,
+                <<"base_dir">> => list_to_binary(Cwd),
+                <<"config">> => #{
+                    <<"max_file_size">> => application:get_env(devout, max_file_size, 10485760),
+                    <<"allowed_extensions">> => case application:get_env(devout, allowed_extensions, all) of
+                        all -> <<"all">>;
+                        List when is_list(List) -> List
+                    end
                 }
             },
-            jsx:encode(Status, [pretty])
+            jsx:encode(Status)
         end,
         <<"application/json">>
     ),
@@ -373,7 +377,7 @@ resources() ->
         <<"Devout Help">>,
         fun devout_server:handle_help_resource/1,
         <<"text/plain">>
-    ).
+    ),
     ok.
 
 -spec prompts() -> ok.

@@ -4,6 +4,8 @@
 %%% @end
 %%%-------------------------------------------------------------------
 -module(devout_simple_test).
+
+-include("devout.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 %%====================================================================
@@ -81,8 +83,8 @@ message_format_test_() ->
 
 test_error_formatting() ->
     % Test error message formatting
-    Result = devout_server:devout_fmt:error(enoent),
+    Result = devout_fmt:err(enoent),
     ?assertEqual(<<"enoent">>, Result),
 
-    Result2 = devout_server:devout_fmt:error({child_creation_failed, <<"test">>, eacces}),
+    Result2 = devout_fmt:err({child_creation_failed, <<"test">>, eacces}),
     ?assert(binary:match(Result2, <<"Failed to create child directory">>) =/= nomatch).
