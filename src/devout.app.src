@@ -1,6 +1,6 @@
 {application, devout, [
-    {description, "Secure File Manager MCP Server - File System Operations"},
-    {vsn, "1.0.0"},
+    {description, "A bare-boned Devin clone for Claude written in Erlang"},
+    {vsn, "0.1.0"},
     {registered, [devout_server, devout_sup]},
     {mod, {devout_app, []}},
     {start_phases, [
