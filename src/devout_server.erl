@@ -14,6 +14,13 @@
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
+%% Tool handlers (exported for testing)
+-export([handle_new_dir/1, handle_new_dirs/1, handle_move/1, handle_write/1, 
+         handle_read/1, handle_show_cwd/1, handle_change_cwd/1]).
+
+%% Utility functions (exported for testing)
+-export([format_error/1]).
+
 -include_lib("kernel/include/logger.hrl").
 
 -record(state, {

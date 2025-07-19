@@ -4,6 +4,7 @@
 *.plt
 erl_crash.dump
 .concrete/DEV_MODE
+.DS_Store
 
 # rebar 2.x
 .rebar
