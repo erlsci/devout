@@ -1,19 +1,27 @@
-# Devout - Secure File Manager MCP Server
+# Devout
 
-A secure, comprehensive file management service implementing the Model Context Protocol (MCP) for Claude Desktop integration. Built with Erlang/OTP using the `erlmcp` library, Devout provides robust file system operations with strong security guarantees.
+[![Build Status][gh-actions-badge]][gh-actions]
+
+[![Project Logo][logo]][logo-large]
+
+*A Devin Clone MCP Server*
+
+A Model Context Protocol (MCP) server written in Erlang that provides file, directory, and version control operations for software projects.
 
 ## Features
 
 ### 🛠️ File Operations
+
 - **new-dir**: Create directories with automatic parent creation
 - **new-dirs**: Create directory structures with multiple children
 - **move**: Safely move/rename files and directories
-- **write**: Create/write files with append mode support  
+- **write**: Create/write files with append mode support
 - **read**: Read file contents with size limits
 - **show-cwd**: Display current working directory
 - **change-cwd**: Navigate to relative directories
 
 ### 🔒 Security Features
+
 - **Path Validation**: Only relative paths allowed, prevents directory traversal
 - **Sandboxing**: All operations restricted to base directory
 - **File Size Limits**: Configurable maximum file sizes
@@ -21,6 +29,7 @@ A secure, comprehensive file management service implementing the Model Context P
 - **Safe Error Handling**: No information disclosure through errors
 
 ### 📚 Resources & Prompts
+
 - **devout://status**: Real-time service status and configuration
 - **devout://help**: Comprehensive tool documentation
 - **create_project**: Intelligent project structure generation (Erlang, web, API, library)
@@ -28,6 +37,7 @@ A secure, comprehensive file management service implementing the Model Context P
 ## Architecture
 
 ### OTP Design
+
 - **Application**: `devout_app` - Standard OTP application callback
 - **Supervisor**: `devout_sup` - Manages server process lifecycle
 - **Server**: `devout_server` - Main gen_server coordinating with erlmcp
@@ -36,6 +46,7 @@ A secure, comprehensive file management service implementing the Model Context P
 - **Entry Point**: `devout_stdio_main` - Standalone stdio executable
 
 ### Security Model
+
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   Claude AI     │───▶│   devout_server  │───▶│ devout_fs_ops   │
@@ -57,6 +68,7 @@ A secure, comprehensive file management service implementing the Model Context P
 ## Quick Start
 
 ### 1. Build
+
 ```bash
 git clone <repository-url>
 cd devout
@@ -65,6 +77,7 @@ rebar3 compile
 ```
 
 ### 2. Test
+
 ```bash
 rebar3 eunit
 ```
@@ -74,7 +87,7 @@ rebar3 eunit
 Edit `claude_desktop_config.json`:
 
 **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-**Windows**: `%APPDATA%\Claude\claude_desktop_config.json`  
+**Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 **Linux**: `~/.config/Claude/claude_desktop_config.json`
 
 ```json
@@ -84,7 +97,7 @@ Edit `claude_desktop_config.json`:
       "command": "erl",
       "args": [
         "-pa", "/ABSOLUTE_PATH/devout/_build/default/lib/devout/ebin",
-        "-pa", "/ABSOLUTE_PATH/devout/_build/default/lib/erlmcp/ebin", 
+        "-pa", "/ABSOLUTE_PATH/devout/_build/default/lib/erlmcp/ebin",
         "-pa", "/ABSOLUTE_PATH/devout/_build/default/lib/jsx/ebin",
         "-pa", "/ABSOLUTE_PATH/devout/_build/default/lib/lager/ebin",
         "-eval", "devout:start()",
@@ -100,6 +113,7 @@ Edit `claude_desktop_config.json`:
 ## Usage Examples
 
 ### 📁 Directory Operations
+
 ```
 User: Create a new project structure called "my_app" with src, test, and docs directories
 
@@ -109,12 +123,13 @@ Claude: I'll create that project structure for you.
 
 Directory structure created successfully:
   - my_app
-  - src  
+  - src
   - test
   - docs
 ```
 
 ### 📝 File Operations
+
 ```
 User: Create a configuration file with some JSON content
 
@@ -126,6 +141,7 @@ Content written to file successfully: my_app/config.json (32 bytes)
 ```
 
 ### 🔍 Navigation & Reading
+
 ```
 User: Show me the current directory and then read the config file
 
@@ -144,6 +160,7 @@ Content of my_app/config.json (32 bytes):
 ```
 
 ### 🏗️ Project Generation
+
 ```
 User: Use the create_project prompt for an Erlang application
 
@@ -174,31 +191,35 @@ Edit `config/sys.config` to customize behavior:
 ## Security Features
 
 ### 🛡️ Path Security
+
 - **Relative Paths Only**: Absolute paths rejected (`/etc/passwd` ❌)
-- **Traversal Prevention**: Parent directory access blocked (`../../../etc` ❌) 
+- **Traversal Prevention**: Parent directory access blocked (`../../../etc` ❌)
 - **Base Directory Enforcement**: Operations confined to working directory
 - **Path Normalization**: Handles `./`, `//`, and other edge cases
 
-### 📏 Resource Limits  
+### 📏 Resource Limits
+
 - **File Size Limits**: Configurable maximum file sizes (default: 10MB)
 - **Operation Whitelisting**: Restrict available operations per deployment
 - **Extension Filtering**: Optional file type restrictions
 - **Memory Protection**: Streaming for large files
 
 ### 🔒 Error Handling
+
 - **Information Hiding**: Errors don't leak system details
-- **Graceful Degradation**: Partial failures handled cleanly  
+- **Graceful Degradation**: Partial failures handled cleanly
 - **Audit Logging**: All operations logged for security review
 - **Input Sanitization**: All inputs validated before processing
 
 ## Development
 
 ### Running Tests
+
 ```bash
 # Full test suite
 rebar3 eunit
 
-# Specific test modules  
+# Specific test modules
 rebar3 eunit --module=devout_test
 
 # With coverage
@@ -206,6 +227,7 @@ rebar3 cover
 ```
 
 ### Code Quality
+
 ```bash
 # Static analysis
 rebar3 dialyzer
@@ -218,6 +240,7 @@ rebar3 lint
 ```
 
 ### Development Mode
+
 ```bash
 # Interactive shell
 rebar3 shell
@@ -230,6 +253,7 @@ devout_server:start_stdio().
 
 1. **Add to allowed_operations** in `devout.app.src`
 2. **Implement in devout_fs_ops.erl**:
+
    ```erlang
    my_operation(Path) ->
        case devout_path_validator:validate_path(Path) of
@@ -240,16 +264,20 @@ devout_server:start_stdio().
                {error, Reason}
        end.
    ```
+
 3. **Register tool in devout_server.erl**:
+
    ```erlang
    ok = erlmcp_stdio:add_tool(
-       <<"my-operation">>, 
+       <<"my-operation">>,
        <<"Description">>,
        fun handle_my_operation/1,
        SchemaMap
    ).
    ```
+
 4. **Add handler**:
+
    ```erlang
    handle_my_operation(#{<<"path">> := Path}) ->
        case devout_fs_ops:my_operation(Path) of
@@ -261,6 +289,7 @@ devout_server:start_stdio().
 ## Monitoring & Debugging
 
 ### Health Checks
+
 ```bash
 # Check if application is running
 erl -eval "io:format('~p~n', [application:which_applications()]), halt()."
@@ -270,7 +299,9 @@ erl -eval "io:format('~p~n', [whereis(devout_server)]), halt()."
 ```
 
 ### Logging
+
 Logs go to stderr to avoid interfering with MCP protocol on stdout:
+
 - **Info**: Service lifecycle events
 - **Warning**: Security violations, invalid paths
 - **Error**: Operation failures, system errors
@@ -288,32 +319,44 @@ Logs go to stderr to avoid interfering with MCP protocol on stdout:
 ## Performance
 
 - **Memory Usage**: ~10MB base + file buffers
-- **Throughput**: 1000+ operations/second for small files  
+- **Throughput**: 1000+ operations/second for small files
 - **Latency**: <10ms for typical operations
 - **Scalability**: Single-threaded, suitable for interactive use
 
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch  
+2. Create a feature branch
 3. Add tests for new functionality
 4. Ensure all tests pass: `rebar3 eunit`
 5. Run static analysis: `rebar3 dialyzer`
 6. Submit a pull request
 
 ### Code Style
+
 - Use OTP principles and gen_server patterns
 - Comprehensive error handling with proper types
 - Security-first design - validate all inputs
 - Document all public functions with edoc
 - Follow Erlang naming conventions
 
-## License
-
-Apache License 2.0 - see LICENSE file for details.
-
 ## Acknowledgments
 
 - Built on the excellent [erlmcp](https://github.com/erlsci/erlmcp) library
 - Inspired by security practices from the Erlang/OTP ecosystem
 - Thanks to the Claude Desktop team for MCP protocol specification
+
+## License
+
+Apache License 2.0 - see LICENSE file for details.
+
+## External Resources
+
+- [Get started with the Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction)
+
+[//]: ---Named-Links---
+
+[logo]: priv/images/project-logo.png
+[logo-large]: priv/images/project-logo-large.png
+[gh-actions-badge]: https://github.com/erlsci/devout/workflows/ci/badge.svg
+[gh-actions]: https://github.com/erlsci/devout/actions?query=workflow%3Aci
