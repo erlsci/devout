@@ -37,11 +37,11 @@ test_absolute_paths() ->
 test_parent_traversal() ->
     % With a base directory set, these should be rejected
     BaseDir = "/tmp/test_base",
-    ?assertEqual({error, parent_traversal_not_allowed}, 
+    ?assertEqual({error, parent_traversal_not_allowed},
                  devout_path_validator:validate_path("../escape", BaseDir)),
-    ?assertEqual({error, parent_traversal_not_allowed}, 
+    ?assertEqual({error, parent_traversal_not_allowed},
                  devout_path_validator:validate_path("good/../../../bad", BaseDir)),
-    ?assertEqual({error, parent_traversal_not_allowed}, 
+    ?assertEqual({error, parent_traversal_not_allowed},
                  devout_path_validator:validate_path("./good/../../bad", BaseDir)).
 
 test_path_normalization() ->
@@ -67,7 +67,7 @@ test_binary_paths() ->
     % Test that binary paths are handled correctly
     BaseDir = "/tmp/test",
     ?assertMatch({ok, _}, devout_path_validator:validate_path(<<"test.txt">>, BaseDir)),
-    ?assertEqual({error, absolute_path_not_allowed}, 
+    ?assertEqual({error, absolute_path_not_allowed},
                  devout_path_validator:validate_path(<<"/etc/passwd">>, BaseDir)).
 
 %%====================================================================
@@ -81,8 +81,8 @@ message_format_test_() ->
 
 test_error_formatting() ->
     % Test error message formatting
-    Result = devout_server:format_error(enoent),
+    Result = devout_server:devout_fmt:error(enoent),
     ?assertEqual(<<"enoent">>, Result),
-    
-    Result2 = devout_server:format_error({child_creation_failed, <<"test">>, eacces}),
+
+    Result2 = devout_server:devout_fmt:error({child_creation_failed, <<"test">>, eacces}),
     ?assert(binary:match(Result2, <<"Failed to create child directory">>) =/= nomatch).

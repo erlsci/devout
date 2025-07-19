@@ -4,7 +4,6 @@
 %%% @end
 %%%-------------------------------------------------------------------
 -module(devout_sup).
-
 -behaviour(supervisor).
 
 %% API
@@ -48,16 +47,16 @@ start_link() ->
     ChildSpec :: supervisor:child_spec().
 init([]) ->
     ?LOG_INFO("Initializing Devout supervisor"),
-    
+
     MaxRestarts = 1000,
     MaxSecondsBetweenRestarts = 3600,
-    
+
     SupFlags = #{
         strategy => one_for_one,
         intensity => MaxRestarts,
         period => MaxSecondsBetweenRestarts
     },
-    
+
     % Child specification for the MCP server
     DevoutServer = #{
         id => devout_server,
@@ -67,8 +66,8 @@ init([]) ->
         type => worker,
         modules => [devout_server]
     },
-    
+
     Children = [DevoutServer],
-    
+
     ?LOG_INFO("Devout supervisor initialized with ~p children", [length(Children)]),
     {ok, {SupFlags, Children}}.

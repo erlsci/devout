@@ -1,18 +1,49 @@
-.eunit
-*.o
+# Erlang
 *.beam
 *.plt
+*.o
+*.so
+*.dylib
 erl_crash.dump
+core.*
 .concrete/DEV_MODE
-.DS_Store
-
-# rebar 2.x
-.rebar
-rel/example_project
-ebin/*.beam
-deps
 
 # rebar 3
 .rebar3
 _build/
 _checkouts/
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+\#*\#
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Coverage reports
+_build/test/cover/
+*.coverdata
+
+# Documentation build artifacts
+doc/*.html
+doc/*.css
+doc/*.png
+doc/edoc-info
+
+# Test artifacts
+.eunit/
+test/*.beam
+
+# Temporary files
+*.tmp
+*.temp

@@ -21,6 +21,19 @@ A Model Context Protocol (MCP) server written in Erlang that provides file, dire
 - **show-cwd**: Display current working directory
 - **change-cwd**: Navigate to relative directories
 
+### 🐙 Git Operations
+
+- **git-add**: Add files to staging area (`git add <files>`)
+- **git-log**: Show commit history (`git log [options]`)
+- **git-diff**: Show differences (no args, 1 arg, or 2 args)
+- **git-pull**: Pull with rebase (`git pull <remote> <branch> --rebase`)
+- **git-checkout-branch**: Create and checkout new branch (`git checkout -b <name>`)
+- **git-push**: Push to remote (`git push <remote>`)
+- **git-commit-all**: Commit all changes (`git commit -a -m <message>`)
+- **git-commit-files**: Commit specific files (`git commit <files> -m <message>`)
+- **git-clone**: Clone repository (`git clone <url>`)
+- **git-status**: Show repository status (`git status --porcelain`)
+
 ### 🔒 Security Features
 
 - **Path Validation**: Only relative paths allowed, prevents directory traversal
@@ -44,6 +57,7 @@ A Model Context Protocol (MCP) server written in Erlang that provides file, dire
 - **Server**: `devout_server` - Main gen_server coordinating with erlmcp
 - **Operations**: `devout_fs` - File system operation implementations
 - **Validation**: `devout_path_validator` - Security and path validation
+- **Git Operations**: `devout_git` - Git command implementations
 - **Entry Point**: `devout_stdio_main` - Standalone stdio executable
 
 ### Security Model
@@ -52,19 +66,26 @@ A Model Context Protocol (MCP) server written in Erlang that provides file, dire
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   Claude AI     │───▶│   devout_server  │───▶│    devout_fs    │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
-                                │                       │
-                                ▼                       ▼
+                            │      │                    │
+                            │      ▼                    ▼
                        ┌──────────────────┐    ┌─────────────────┐
                        │ erlmcp_stdio     │    │ path_validator  │
                        │ (MCP Protocol)   │    │ (Security)      │
                        └──────────────────┘    └─────────────────┘
+                            │
+                            ▼
+                       ┌──────────────────┐    ┌─────────────────┐
+                       │    devout_git    │───▶│     erlexec     │
+                       └──────────────────┘    │ (Proc. Mgmt.)   │
+                                               └─────────────────┘
+
 ```
 
 ## Prerequisites
 
 - **Erlang/OTP 25+**
 - **Rebar3**
-- **Git** (for dependencies)
+- **Git** (for dependencies & Git operations)
 
 ## Quick Start
 
@@ -158,7 +179,7 @@ Claude: I'll create a config file for you.
 Content written to file successfully: my_app/config.json (32 bytes)
 ```
 
-### 🔍 Navigation & Reading
+#### 🔍 Navigation & Reading
 
 ```
 User: Show me the current directory and then read the config file
@@ -177,7 +198,7 @@ Content of my_app/config.json (32 bytes):
 }
 ```
 
-### 🏗️ Project Generation
+#### 🏗️ Project Generation
 
 ```
 User: Use the create_project prompt for an Erlang application
@@ -187,6 +208,63 @@ Claude: I'll generate an Erlang project structure prompt.
 [Uses create_project prompt: {"project_name": "my_erlang_app", "project_type": "erlang"}]
 
 Create a project structure for 'my_erlang_app' (erlang project). Create an Erlang/OTP project structure with directories: src, include, test, priv, rebar.config. Use the devout tools to create the necessary directories and files.
+```
+
+### 🐙 Git Operations
+
+#### View Git History
+
+```
+User: Show me the last 5 commits
+
+Claude: I'll show you the recent commit history.
+
+[Uses git-log tool: {"args": "--oneline -5"}]
+
+Git log:
+a1b2c3d Add new feature
+e4f5g6h Fix bug in parser
+i7j8k9l Update documentation
+m1n2o3p Initial commit
+```
+
+#### Create Feature Branch
+
+```
+User: Create a new feature branch called "user-authentication"
+
+Claude: I'll create and checkout a new branch for you.
+
+[Uses git-checkout-branch tool: {"branch": "user-authentication"}]
+
+Git checkout branch successful:
+Switched to a new branch 'user-authentication'
+```
+
+#### Commit Changes
+
+```
+User: Add these files to git and commit them with message "Add user auth"
+
+Claude: I'll stage and commit those files for you.
+
+[Uses git-add tool: {"files": ["src/auth.erl", "test/auth_test.erl"]}]
+[Uses git-commit-files tool: {"files": ["src/auth.erl", "test/auth_test.erl"], "message": "Add user auth"}]
+
+Git operations successful!
+```
+
+#### Sync with Remote
+
+```
+User: Pull latest changes from origin main and then push my branch
+
+Claude: I'll sync with the remote repository for you.
+
+[Uses git-pull tool: {"remote": "origin", "branch": "main"}]
+[Uses git-push tool: {"remote": "origin"}]
+
+Git sync completed successfully!
 ```
 
 ## Configuration
@@ -202,8 +280,78 @@ Edit `config/sys.config` to customize behavior:
         {allowed_operations, [              % Restrict available operations
             new_dir, new_dirs, move, write, read, list_files, show_cwd, change_cwd
         ]}
+    ]},
+
+    {erlexec, [
+        {debug, false},                     % Enable for git command debugging
+        {verbose, false}
     ]}
 ].
+```
+
+## Git Command Reference
+
+| MCP Tool | Git Command | Description |
+|----------|------------|-------------|
+| `git-add` | `git add <files>` | Stage files for commit |
+| `git-log` | `git log [options]` | Show commit history |
+| `git-diff` | `git diff [ref1] [ref2]` | Show differences |
+| `git-pull` | `git pull <remote> <branch> --rebase` | Pull with rebase |
+| `git-checkout-branch` | `git checkout -b <name>` | Create new branch |
+| `git-push` | `git push <remote>` | Push to remote |
+| `git-commit-all` | `git commit -a -m <message>` | Commit all changes |
+| `git-commit-files` | `git commit <files> -m <message>` | Commit specific files |
+| `git-clone` | `git clone <url>` | Clone repository |
+| `git-status` | `git status --porcelain` | Show repo status |
+
+### Git Tool Parameters
+
+#### git-add
+
+```json
+{
+  "files": ["file1.txt", "file2.txt"]  // Array of files
+  // OR
+  "file": "single_file.txt"            // Single file
+}
+```
+
+#### git-log
+
+```json
+{
+  "args": "--oneline -10"              // Optional: git log arguments
+}
+```
+
+#### git-diff
+
+```json
+{
+  // No parameters = working directory vs staged
+  // OR
+  "ref": "HEAD~1"                      // Compare against reference
+  // OR
+  "ref1": "HEAD~2",                    // Compare two references
+  "ref2": "HEAD~1"
+}
+```
+
+#### git-pull
+
+```json
+{
+  "remote": "origin",                  // Required: remote name
+  "branch": "main"                     // Required: branch name
+}
+```
+
+#### git-push
+
+```json
+{
+  "remote": "origin"                   // Required: remote name
+}
 ```
 
 ## Security Features
@@ -267,7 +415,7 @@ rebar3 shell
 devout_server:start_stdio().
 ```
 
-### Adding Operations
+### Adding FS Operations
 
 1. **Add to allowed_operations** in `devout.app.src`
 2. **Implement in devout_fs.erl** (if needed):
@@ -300,9 +448,41 @@ devout_server:start_stdio().
    handle_my_operation(#{<<"path">> := Path}) ->
        case devout_fs:my_operation(Path) of
            ok -> <<"Success message">>;
-           {error, Reason} -> format_error(Reason)
+           {error, Reason} -> devout_fmt:error(Reason)
        end.
    ```
+
+### Adding New Git Operations
+
+1. **Add function to devout_git.erl**:
+
+   ```erlang
+   my_git_operation(Args) ->
+       execute_git(["my-operation"] ++ Args).
+   ```
+
+2. **Add MCP handler**:
+
+   ```erlang
+   handle_my_git_operation(#{<<"param">> := Value}) ->
+       case my_git_operation([binary_to_list(Value)]) of
+           {ok, Output} -> <<"Success: ", Output/binary>>;
+           {error, Reason} -> devout_fmt:error(Reason)
+       end.
+   ```
+
+3. **Register tool in devout_server.erl**:
+
+   ```erlang
+   ok = erlmcp_stdio:add_tool(
+       <<"git-my-operation">>,
+       <<"Description of my git operation">>,
+       fun devout_git:handle_my_git_operation/1,
+       Schema
+   ).
+   ```
+
+4. **Add tests in devout_git_test.erl**
 
 ## Monitoring & Debugging
 
@@ -324,7 +504,7 @@ Logs go to stderr to avoid interfering with MCP protocol on stdout:
 - **Warning**: Security violations, invalid paths
 - **Error**: Operation failures, system errors
 
-### Common Issues
+## Troubleshooting
 
 | Issue | Cause | Solution |
 |-------|-------|----------|
@@ -333,6 +513,10 @@ Logs go to stderr to avoid interfering with MCP protocol on stdout:
 | File too large | Exceeds size limit | Check `max_file_size` config |
 | Permission denied | File system permissions | Check directory ownership |
 | Tool not found | Version mismatch | Verify erlmcp compatibility |
+| Git command timeout | Long-running operation | Increase timeout in erlexec config |
+| Git not found | Missing git installation | Install git and ensure it's in PATH |
+| Merge conflicts | Conflicting changes | Resolve conflicts manually |
+| Repository not found | Not in git repository | Initialize with `git init` first |
 
 ## Performance
 
@@ -371,6 +555,8 @@ Apache License 2.0 - see LICENSE file for details.
 ## External Resources
 
 - [Get started with the Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction)
+- [erlexec - Erlang Port Program for OS Command Execution](https://github.com/saleyn/erlexec)
+- [Git Documentation](https://git-scm.com/doc)
 
 [//]: ---Named-Links---
 
