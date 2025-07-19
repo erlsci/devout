@@ -14,7 +14,7 @@
 
 %% Tool handlers
 -export([handle_new_dir/1, handle_new_dirs/1, handle_move/1, handle_write/1, 
-         handle_read/1, handle_show_cwd/1, handle_change_cwd/1]).
+         handle_read/1, handle_show_cwd/1, handle_change_cwd/1, handle_list_files/1]).
 
 %% Resource handlers
 -export([handle_status_resource/1, handle_help_resource/1]).
@@ -26,6 +26,7 @@
 -export([format_error/1]).
 
 -include_lib("kernel/include/logger.hrl").
+-include_lib("kernel/include/file.hrl").
 
 -record(state, {
     base_directory :: string()
@@ -235,6 +236,71 @@ handle_change_cwd(#{<<"path">> := Path}) ->
         {error, Reason} ->
             ReasonBin = format_error(Reason),
             <<"Error changing directory: ", ReasonBin/binary>>
+    end.
+
+handle_list_files(Args) ->
+    Path = maps:get(<<"path">>, Args, <<".">>),
+    
+    % Handle current directory specially
+    ValidPath = case Path of
+        <<".">> ->
+            case file:get_cwd() of
+                {ok, Cwd} -> {ok, Cwd};
+                Error -> Error
+            end;
+        _ ->
+            devout_path_validator:validate_path(Path)
+    end,
+    
+    case ValidPath of
+        {ok, DirPath} ->
+            case file:list_dir(DirPath) of
+                {ok, Files} ->
+                    case Files of
+                        [] ->
+                            <<"Directory is empty: ", Path/binary>>;
+                        _ ->
+                            % Sort files and get detailed info
+                            DetailedFiles = lists:map(fun(File) ->
+                                FilePath = filename:join(DirPath, File),
+                                case file:read_file_info(FilePath) of
+                                    {ok, FileInfo} ->
+                                        Type = case FileInfo#file_info.type of
+                                            directory -> <<"[DIR]">>;
+                                            regular -> <<"[FILE]">>;
+                                            symlink -> <<"[LINK]">>;
+                                            _ -> <<"[OTHER]">>
+                                        end,
+                                        Size = case FileInfo#file_info.type of
+                                            directory -> <<"">>;
+                                            _ -> 
+                                                SizeBytes = FileInfo#file_info.size,
+                                                <<" (", (integer_to_binary(SizeBytes))/binary, " bytes)">>
+                                        end,
+                                        FileBin = list_to_binary(File),
+                                        <<Type/binary, " ", FileBin/binary, Size/binary>>;
+                                    {error, _} ->
+                                        FileBin = list_to_binary(File),
+                                        <<"[?] ", FileBin/binary, " (info unavailable)">>
+                                end
+                            end, lists:sort(Files)),
+                            
+                            FilesList = lists:join(<<"\n">>, DetailedFiles),
+                            iolist_to_binary([<<"Contents of ", Path/binary, ":\n">>, FilesList])
+                    end;
+                {error, enoent} ->
+                    <<"Error: Directory does not exist: ", Path/binary>>;
+                {error, enotdir} ->
+                    <<"Error: Path is not a directory: ", Path/binary>>;
+                {error, eacces} ->
+                    <<"Error: Permission denied accessing directory: ", Path/binary>>;
+                {error, Reason} ->
+                    ReasonBin = format_error(Reason),
+                    <<"Error listing directory: ", ReasonBin/binary>>
+            end;
+        {error, Reason} ->
+            ReasonBin = format_error(Reason),
+            <<"Invalid path: ", ReasonBin/binary>>
     end.
 
 %%====================================================================

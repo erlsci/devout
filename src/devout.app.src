@@ -23,7 +23,8 @@
             write,
             read,
             show_cwd,
-            change_cwd
+            change_cwd,
+            list_files
         ]},
         {base_directory, undefined},  % Will be set at runtime to current working directory
         {max_file_size, 10485760},    % 10MB max file size

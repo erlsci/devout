@@ -32,14 +32,36 @@
 start(_StartType, _StartArgs) ->
     ?LOG_INFO("Starting Devout MCP server application"),
 
-    % Set the base directory to current working directory if not already set
+    % Set the base directory to current working directory - FIXED VERSION
     case application:get_env(devout, base_directory) of
+        {ok, undefined} ->
+            % If explicitly set to undefined, override it
+            {ok, Cwd} = file:get_cwd(),
+            application:set_env(devout, base_directory, Cwd),
+            ?LOG_INFO("Base directory fixed and set to: ~s", [Cwd]);
         undefined ->
+            % If not set at all, set it
             {ok, Cwd} = file:get_cwd(),
             application:set_env(devout, base_directory, Cwd),
             ?LOG_INFO("Base directory set to: ~s", [Cwd]);
         {ok, ExistingDir} ->
-            ?LOG_INFO("Using existing base directory: ~s", [ExistingDir])
+            % Validate that the existing directory actually exists and is not undefined
+            case ExistingDir of
+                undefined ->
+                    {ok, Cwd} = file:get_cwd(),
+                    application:set_env(devout, base_directory, Cwd),
+                    ?LOG_INFO("Base directory was undefined, fixed and set to: ~s", [Cwd]);
+                _ ->
+                    case filelib:is_dir(ExistingDir) of
+                        true ->
+                            ?LOG_INFO("Using existing base directory: ~s", [ExistingDir]);
+                        false ->
+                            ?LOG_WARNING("Base directory ~s does not exist, using current directory", [ExistingDir]),
+                            {ok, Cwd} = file:get_cwd(),
+                            application:set_env(devout, base_directory, Cwd),
+                            ?LOG_INFO("Base directory set to: ~s", [Cwd])
+                    end
+            end
     end,
 
     case devout_sup:start_link() of
@@ -100,7 +122,7 @@ start_phase(register_tools, _StartType, _PhaseArgs) ->
 %% Register all tools, resources, and prompts with erlmcp_stdio
 %% @end
 %%--------------------------------------------------------------------
--spec register_tools() -> ok | {error, term()}.
+-spec register_tools() -> ok | {error, {atom(), term()}}.
 register_tools() ->
     ?LOG_INFO("Registering tools, resources, and prompts with erlmcp_stdio"),
     try
@@ -262,6 +284,24 @@ setup_tools() ->
                 }
             },
             <<"required">> => [<<"path">>]
+        }
+    ),
+    
+    %% Add list-files tool
+    ok = erlmcp_stdio:add_tool(
+        <<"list-files">>, 
+        <<"List files and directories in a path">>,
+        fun devout_server:handle_list_files/1,
+        #{
+            <<"type">> => <<"object">>,
+            <<"properties">> => #{
+                <<"path">> => #{
+                    <<"type">> => <<"string">>,
+                    <<"description">> => <<"Relative path to list (default: current directory)">>,
+                    <<"default">> => <<".">>
+                }
+            },
+            <<"required">> => []
         }
     ).
 

@@ -17,6 +17,7 @@ A Model Context Protocol (MCP) server written in Erlang that provides file, dire
 - **move**: Safely move/rename files and directories
 - **write**: Create/write files with append mode support
 - **read**: Read file contents with size limits
+- **list-files**: List directory contents with file types and sizes
 - **show-cwd**: Display current working directory
 - **change-cwd**: Navigate to relative directories
 
@@ -121,6 +122,30 @@ Directory structure created successfully:
   - docs
 ```
 
+### 🔍 Directory Exploration
+
+```
+User: What files are in the current directory?
+
+Claude: I'll show you the files in the current directory.
+
+[Uses list-files tool: {}]
+
+Contents of .:
+[FILE] .DS_Store (6148 bytes)
+[DIR] .git
+[DIR] .github
+[FILE] .gitignore (164 bytes)
+[FILE] LICENSE (11358 bytes)
+[FILE] Makefile (4612 bytes)
+[FILE] README.md (9895 bytes)
+[DIR] _build
+[DIR] bin
+[DIR] config
+[DIR] src
+[DIR] test
+```
+
 ### 📝 File Operations
 
 ```
@@ -175,7 +200,7 @@ Edit `config/sys.config` to customize behavior:
         {allowed_extensions, all},          % or [<<".txt">>, <<".md">>]
         {enable_recursive_delete, false},   % Safety first
         {allowed_operations, [              % Restrict available operations
-            new_dir, new_dirs, move, write, read, show_cwd, change_cwd
+            new_dir, new_dirs, move, write, read, list_files, show_cwd, change_cwd
         ]}
     ]}
 ].
@@ -245,7 +270,7 @@ devout_server:start_stdio().
 ### Adding Operations
 
 1. **Add to allowed_operations** in `devout.app.src`
-2. **Implement in devout_fs_ops.erl**:
+2. **Implement in devout_fs_ops.erl** (if needed):
 
    ```erlang
    my_operation(Path) ->
@@ -258,18 +283,18 @@ devout_server:start_stdio().
        end.
    ```
 
-3. **Register tool in devout_server.erl**:
+3. **Register tool in devout_app.erl**:
 
    ```erlang
    ok = erlmcp_stdio:add_tool(
        <<"my-operation">>,
        <<"Description">>,
-       fun handle_my_operation/1,
+       fun devout_server:handle_my_operation/1,
        SchemaMap
    ).
    ```
 
-4. **Add handler**:
+4. **Add handler in devout_server.erl**:
 
    ```erlang
    handle_my_operation(#{<<"path">> := Path}) ->
