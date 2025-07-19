@@ -3,6 +3,9 @@
     {vsn, "1.0.0"},
     {registered, [devout_server, devout_sup]},
     {mod, {devout_app, []}},
+    {start_phases, [
+        {register_tools, []}
+    ]},
     {applications, [
         kernel,
         stdlib,

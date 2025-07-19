@@ -65,13 +65,33 @@ start(_StartType, _StartArgs) ->
     Reason :: term().
 start_phase(register_tools, _StartType, _PhaseArgs) ->
     ?LOG_INFO("Starting phase: register_tools"),
-    % Now that erlmcp is fully started, register our tools directly
-    case register_tools() of
-        ok ->
-            ?LOG_INFO("Successfully registered tools with erlmcp_stdio"),
-            ok;
+    
+    % First, start the erlmcp stdio server
+    case erlmcp_sup:start_stdio_server() of
+        {ok, Pid} ->
+            ?LOG_INFO("erlmcp stdio server started successfully with pid: ~p", [Pid]),
+            
+            % Register our tools
+            case register_tools() of
+                ok ->
+                    ?LOG_INFO("Successfully registered tools with erlmcp_stdio"),
+                    
+                    % Monitor the stdio server and keep the application alive
+                    spawn(fun() -> 
+                        monitor(process, Pid),
+                        receive
+                            {'DOWN', _, process, Pid, Reason} ->
+                                ?LOG_INFO("stdio server terminated: ~p", [Reason]),
+                                init:stop()
+                        end
+                    end),
+                    ok;
+                {error, Reason} ->
+                    ?LOG_ERROR("Failed to register tools: ~p", [Reason]),
+                    {error, Reason}
+            end;
         {error, Reason} ->
-            ?LOG_ERROR("Failed to register tools: ~p", [Reason]),
+            ?LOG_ERROR("Failed to start erlmcp stdio server: ~p", [Reason]),
             {error, Reason}
     end.
 

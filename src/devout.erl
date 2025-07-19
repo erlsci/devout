@@ -11,5 +11,5 @@
 %%====================================================================
 
 start() ->
-    %% Simply start the devout application - OTP will handle dependencies
+    %% Start the devout application - OTP will handle dependencies and start phases
     application:ensure_all_started(devout).

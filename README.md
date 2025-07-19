@@ -94,15 +94,8 @@ Edit `claude_desktop_config.json`:
 {
   "mcpServers": {
     "devout": {
-      "command": "erl",
-      "args": [
-        "-pa", "/ABSOLUTE_PATH/devout/_build/default/lib/devout/ebin",
-        "-pa", "/ABSOLUTE_PATH/devout/_build/default/lib/erlmcp/ebin",
-        "-pa", "/ABSOLUTE_PATH/devout/_build/default/lib/jsx/ebin",
-        "-pa", "/ABSOLUTE_PATH/devout/_build/default/lib/lager/ebin",
-        "-eval", "devout:start()",
-        "-noshell"
-      ]
+        "command": "/Users/oubiwann/lab/erlsci/devout/bin/start.sh",
+        "args": []
     }
   }
 }
