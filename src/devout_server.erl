@@ -1,32 +1,34 @@
 %%%-------------------------------------------------------------------
 %%% @doc
-%%% Devout MCP server - Main server that coordinates with erlmcp_stdio
-%%% Combines the best of both approaches: simple erlmcp integration with
-%%% robust security and error handling
+%%% Devout MCP server - Tool and resource handlers for erlmcp
 %%% @end
 %%%-------------------------------------------------------------------
 -module(devout_server).
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, start_stdio/0, stop/0]).
+-export([start_link/0, stop/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
-%% Tool handlers (exported for testing)
+%% Tool handlers
 -export([handle_new_dir/1, handle_new_dirs/1, handle_move/1, handle_write/1, 
          handle_read/1, handle_show_cwd/1, handle_change_cwd/1]).
 
-%% Utility functions (exported for testing)
+%% Resource handlers
+-export([handle_status_resource/1, handle_help_resource/1]).
+
+%% Prompt handlers
+-export([handle_create_project_prompt/1]).
+
+%% Utility functions
 -export([format_error/1]).
 
 -include_lib("kernel/include/logger.hrl").
 
 -record(state, {
-    stdio_started = false :: boolean(),
-    base_directory :: string(),
-    server_config :: map()
+    base_directory :: string()
 }).
 
 -type state() :: #state{}.
@@ -37,9 +39,6 @@
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-
-start_stdio() ->
-    gen_server:call(?MODULE, start_stdio).
 
 stop() ->
     gen_server:stop(?MODULE).
@@ -53,36 +52,17 @@ init([]) ->
     process_flag(trap_exit, true),
     ?LOG_INFO("Initializing Devout MCP server"),
     
-    % Get configuration
-    {ok, ServerConfig} = application:get_env(devout, mcp_server_config),
+    % Get base directory
     {ok, BaseDir} = application:get_env(devout, base_directory),
     
-    State = #state{
-        server_config = ServerConfig,
-        base_directory = BaseDir
-    },
+    % Note: We don't register tools here anymore - that happens in the start_phase
+    
+    State = #state{base_directory = BaseDir},
     
     ?LOG_INFO("Devout MCP server initialized with base directory: ~s", [BaseDir]),
     {ok, State}.
 
--spec handle_call(term(), {pid(), term()}, state()) -> 
-    {reply, term(), state()} | {stop, normal, ok, state()}.
-handle_call(start_stdio, _From, #state{stdio_started = false} = State) ->
-    case setup_stdio_server() of
-        ok ->
-            ?LOG_INFO("Stdio server started successfully"),
-            {reply, ok, State#state{stdio_started = true}};
-        {error, Reason} ->
-            ?LOG_ERROR("Failed to start stdio server: ~p", [Reason]),
-            {reply, {error, Reason}, State}
-    end;
-
-handle_call(start_stdio, _From, #state{stdio_started = true} = State) ->
-    {reply, {error, already_started}, State};
-
-handle_call(stop, _From, State) ->
-    {stop, normal, ok, State};
-
+-spec handle_call(term(), {pid(), term()}, state()) -> {reply, term(), state()}.
 handle_call(_Request, _From, State) ->
     {reply, {error, unknown_request}, State}.
 
@@ -102,192 +82,6 @@ terminate(_Reason, _State) ->
 -spec code_change(term(), state(), term()) -> {ok, state()}.
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
-%%====================================================================
-%% Internal functions
-%%====================================================================
-
-setup_stdio_server() ->
-    case erlmcp_stdio:start() of
-        ok ->
-            setup_tools(),
-            setup_resources(),
-            setup_prompts(),
-            ok;
-        {error, Reason} ->
-            {error, Reason}
-    end.
-
-setup_tools() ->
-    %% Add new-dir tool
-    ok = erlmcp_stdio:add_tool(
-        <<"new-dir">>, 
-        <<"Create a new directory">>,
-        fun handle_new_dir/1,
-        #{
-            <<"type">> => <<"object">>,
-            <<"properties">> => #{
-                <<"path">> => #{
-                    <<"type">> => <<"string">>,
-                    <<"description">> => <<"Relative path for the directory to create">>
-                }
-            },
-            <<"required">> => [<<"path">>]
-        }
-    ),
-    
-    %% Add new-dirs tool (create directory with children)
-    ok = erlmcp_stdio:add_tool(
-        <<"new-dirs">>, 
-        <<"Create a directory with child directories">>,
-        fun handle_new_dirs/1,
-        #{
-            <<"type">> => <<"object">>,
-            <<"properties">> => #{
-                <<"path">> => #{
-                    <<"type">> => <<"string">>,
-                    <<"description">> => <<"Base directory path to create">>
-                },
-                <<"children">> => #{
-                    <<"type">> => <<"array">>,
-                    <<"items">> => #{<<"type">> => <<"string">>},
-                    <<"description">> => <<"Child directory names to create">>
-                }
-            },
-            <<"required">> => [<<"path">>]
-        }
-    ),
-    
-    %% Add move tool
-    ok = erlmcp_stdio:add_tool(
-        <<"move">>, 
-        <<"Move or rename a file or directory">>,
-        fun handle_move/1,
-        #{
-            <<"type">> => <<"object">>,
-            <<"properties">> => #{
-                <<"source">> => #{
-                    <<"type">> => <<"string">>,
-                    <<"description">> => <<"Relative path of source file/directory">>
-                },
-                <<"destination">> => #{
-                    <<"type">> => <<"string">>,
-                    <<"description">> => <<"Relative path of destination">>
-                }
-            },
-            <<"required">> => [<<"source">>, <<"destination">>]
-        }
-    ),
-    
-    %% Add write tool
-    ok = erlmcp_stdio:add_tool(
-        <<"write">>, 
-        <<"Create or write to a file">>,
-        fun handle_write/1,
-        #{
-            <<"type">> => <<"object">>,
-            <<"properties">> => #{
-                <<"path">> => #{
-                    <<"type">> => <<"string">>,
-                    <<"description">> => <<"Relative path for the file">>
-                },
-                <<"content">> => #{
-                    <<"type">> => <<"string">>,
-                    <<"description">> => <<"Content to write to the file">>
-                },
-                <<"mode">> => #{
-                    <<"type">> => <<"string">>,
-                    <<"enum">> => [<<"write">>, <<"append">>],
-                    <<"description">> => <<"Write mode: write (overwrite) or append">>,
-                    <<"default">> => <<"write">>
-                }
-            },
-            <<"required">> => [<<"path">>, <<"content">>]
-        }
-    ),
-    
-    %% Add read tool
-    ok = erlmcp_stdio:add_tool(
-        <<"read">>, 
-        <<"Read a file">>,
-        fun handle_read/1,
-        #{
-            <<"type">> => <<"object">>,
-            <<"properties">> => #{
-                <<"path">> => #{
-                    <<"type">> => <<"string">>,
-                    <<"description">> => <<"Relative path of the file to read">>
-                }
-            },
-            <<"required">> => [<<"path">>]
-        }
-    ),
-    
-    %% Add show_cwd tool (from devout)
-    ok = erlmcp_stdio:add_tool(
-        <<"show-cwd">>, 
-        <<"Show current working directory">>,
-        fun handle_show_cwd/1,
-        #{
-            <<"type">> => <<"object">>,
-            <<"properties">> => #{},
-            <<"required">> => []
-        }
-    ),
-    
-    %% Add change_cwd tool (from devout)
-    ok = erlmcp_stdio:add_tool(
-        <<"change-cwd">>, 
-        <<"Change current working directory">>,
-        fun handle_change_cwd/1,
-        #{
-            <<"type">> => <<"object">>,
-            <<"properties">> => #{
-                <<"path">> => #{
-                    <<"type">> => <<"string">>,
-                    <<"description">> => <<"Relative path to change to">>
-                }
-            },
-            <<"required">> => [<<"path">>]
-        }
-    ).
-
-setup_resources() ->
-    %% Add status resource
-    ok = erlmcp_stdio:add_resource(
-        <<"devout://status">>, 
-        <<"Devout Status">>,
-        fun handle_status_resource/1,
-        <<"text/plain">>
-    ),
-    
-    %% Add help resource
-    ok = erlmcp_stdio:add_resource(
-        <<"devout://help">>, 
-        <<"Devout Help">>,
-        fun handle_help_resource/1,
-        <<"text/plain">>
-    ).
-
-setup_prompts() ->
-    %% Add create_project prompt
-    ok = erlmcp_stdio:add_prompt(
-        <<"create_project">>, 
-        <<"Create a project structure">>,
-        fun handle_create_project_prompt/1,
-        [
-            #{
-                <<"name">> => <<"project_name">>, 
-                <<"description">> => <<"Name of the project">>, 
-                <<"required">> => true
-            },
-            #{
-                <<"name">> => <<"project_type">>, 
-                <<"description">> => <<"Type of project (web, api, library, erlang)">>, 
-                <<"required">> => false
-            }
-        ]
-    ).
 
 %%====================================================================
 %% Tool handlers - Using devout_fs_ops for actual operations

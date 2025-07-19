@@ -13,13 +13,6 @@
         erlmcp
     ]},
     {env, [
-        {mcp_server_config, [
-            {transport, stdio},
-            {name, <<"devout-fs">>},
-            {version, <<"1.0.0">>},
-            {vendor, <<"erlsci">>},
-            {description, <<"Secure file system operations for AI assistants">>}
-        ]},
         {allowed_operations, [
             new_dir,
             new_dirs,

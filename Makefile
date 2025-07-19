@@ -65,7 +65,10 @@ start: build
 # Start the MCP server in stdio mode (for MCP client integration)
 start-mcp: build
 	@echo "Starting Devout MCP Server in stdio mode..."
-	@erl -pa _build/default/lib/*/ebin -config config/sys.config -eval "application:ensure_all_started(devout)" -noshell -noinput
+	@erl -pa $(shell rebar3 path) \
+		-eval "devout:start()" \
+		-noshell \
+		-noinput
 
 # Stop the server (if running in background)
 stop:
@@ -121,6 +124,11 @@ uninstall:
 # Development helper - quick rebuild and start
 quick: clean build start-mcp
 
+# Test the rebar3 path command
+test-path:
+	@echo "Testing rebar3 path output:"
+	@rebar3 path
+
 # Show help
 help:
 	@echo "Available targets:"
@@ -138,6 +146,8 @@ help:
 	@echo "  release     - Create release"
 	@echo "  start       - Start development server"
 	@echo "  start-mcp   - Start server in MCP stdio mode"
+	@echo "  start-mcp-alt - Alternative MCP start method"
+	@echo "  start-mcp-debug - Start MCP server with debug output"
 	@echo "  stop        - Stop server"
 	@echo "  check       - Run all checks (includes full Dialyzer)"
 	@echo "  format      - Format code"
@@ -149,4 +159,5 @@ help:
 	@echo "  install     - Install locally"
 	@echo "  uninstall   - Uninstall"
 	@echo "  quick       - Quick rebuild and start"
+	@echo "  test-path   - Test rebar3 path output"
 	@echo "  help        - Show this help"
