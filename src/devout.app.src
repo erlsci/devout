@@ -35,7 +35,7 @@
         devout_app,
         devout_sup,
         devout_server,
-        devout_fs_ops,
+        devout_fs,
         devout_path_validator,
         devout
     ]},

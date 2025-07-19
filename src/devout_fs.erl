@@ -4,7 +4,7 @@
 %%% for the Devin clone MCP server
 %%% @end
 %%%-------------------------------------------------------------------
--module(devout_fs_ops).
+-module(devout_fs).
 
 -export([
     show_cwd/0,

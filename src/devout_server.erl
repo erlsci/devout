@@ -13,7 +13,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 %% Tool handlers
--export([handle_new_dir/1, handle_new_dirs/1, handle_move/1, handle_write/1, 
+-export([handle_new_dir/1, handle_new_dirs/1, handle_move/1, handle_write/1,
          handle_read/1, handle_show_cwd/1, handle_change_cwd/1, handle_list_files/1]).
 
 %% Resource handlers
@@ -52,14 +52,14 @@ stop() ->
 init([]) ->
     process_flag(trap_exit, true),
     ?LOG_INFO("Initializing Devout MCP server"),
-    
+
     % Get base directory
     {ok, BaseDir} = application:get_env(devout, base_directory),
-    
+
     % Note: We don't register tools here anymore - that happens in the start_phase
-    
+
     State = #state{base_directory = BaseDir},
-    
+
     ?LOG_INFO("Devout MCP server initialized with base directory: ~s", [BaseDir]),
     {ok, State}.
 
@@ -85,11 +85,11 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 %%====================================================================
-%% Tool handlers - Using devout_fs_ops for actual operations
+%% Tool handlers - Using devout_fs for actual operations
 %%====================================================================
 
 handle_new_dir(#{<<"path">> := Path}) ->
-    case devout_fs_ops:create_directory(Path) of
+    case devout_fs:create_directory(Path) of
         ok ->
             <<"Directory created successfully: ", Path/binary>>;
         {error, Reason} ->
@@ -99,13 +99,13 @@ handle_new_dir(#{<<"path">> := Path}) ->
 
 handle_new_dirs(#{<<"path">> := Path} = Args) ->
     Children = maps:get(<<"children">>, Args, []),
-    
+
     %% First create the base directory
-    case devout_fs_ops:create_directory(Path) of
+    case devout_fs:create_directory(Path) of
         ok ->
             case create_children(Path, Children, []) of
                 {ok, Results} ->
-                    iolist_to_binary([<<"Directory structure created successfully:\n  - ">>, 
+                    iolist_to_binary([<<"Directory structure created successfully:\n  - ">>,
                                       Path, Results]);
                 {error, Reason} ->
                     ReasonBin = format_error(Reason),
@@ -120,7 +120,7 @@ create_children(_BasePath, [], Acc) ->
     {ok, lists:reverse(Acc)};
 create_children(BasePath, [Child | Rest], Acc) ->
     ChildPath = <<BasePath/binary, "/", Child/binary>>,
-    case devout_fs_ops:create_directory(ChildPath) of
+    case devout_fs:create_directory(ChildPath) of
         ok ->
             create_children(BasePath, Rest, [<<"\n  - ", Child/binary>> | Acc]);
         {error, Reason} ->
@@ -129,7 +129,7 @@ create_children(BasePath, [Child | Rest], Acc) ->
 
 handle_move(#{<<"source">> := Source, <<"destination">> := Destination}) ->
     %% Use path validator to ensure both paths are safe
-    case {devout_path_validator:validate_path(Source), 
+    case {devout_path_validator:validate_path(Source),
           devout_path_validator:validate_path(Destination)} of
         {{ok, ValidSource}, {ok, ValidDest}} ->
             case file:rename(ValidSource, ValidDest) of
@@ -149,7 +149,7 @@ handle_move(#{<<"source">> := Source, <<"destination">> := Destination}) ->
 
 handle_write(#{<<"path">> := Path, <<"content">> := Content} = Args) ->
     Mode = maps:get(<<"mode">>, Args, <<"write">>),
-    
+
     %% Check file size limit
     {ok, MaxSize} = application:get_env(devout, max_file_size),
     case byte_size(Content) > MaxSize of
@@ -157,14 +157,14 @@ handle_write(#{<<"path">> := Path, <<"content">> := Content} = Args) ->
             MaxSizeBin = integer_to_binary(MaxSize),
             <<"Error: Content exceeds maximum file size (", MaxSizeBin/binary, " bytes)">>;
         false ->
-            case devout_fs_ops:create_file(Path, Content) of
+            case devout_fs:create_file(Path, Content) of
                 ok when Mode =:= <<"append">> ->
                     % Handle append mode by reading existing content first
                     handle_append_write(Path, Content);
                 ok ->
                     Size = byte_size(Content),
                     SizeBin = integer_to_binary(Size),
-                    <<"Content written to file successfully: ", Path/binary, 
+                    <<"Content written to file successfully: ", Path/binary,
                       " (", SizeBin/binary, " bytes)">>;
                 {error, Reason} ->
                     ReasonBin = format_error(Reason),
@@ -179,7 +179,7 @@ handle_append_write(Path, Content) ->
                 ok ->
                     Size = byte_size(Content),
                     SizeBin = integer_to_binary(Size),
-                    <<"Content appended to file successfully: ", Path/binary, 
+                    <<"Content appended to file successfully: ", Path/binary,
                       " (", SizeBin/binary, " bytes)">>;
                 {error, Reason} ->
                     ReasonBin = format_error(Reason),
@@ -219,7 +219,7 @@ handle_read(#{<<"path">> := Path}) ->
     end.
 
 handle_show_cwd(_Args) ->
-    case devout_fs_ops:show_cwd() of
+    case devout_fs:show_cwd() of
         {ok, Cwd} ->
             CwdBin = list_to_binary(Cwd),
             <<"Current working directory: ", CwdBin/binary>>;
@@ -229,7 +229,7 @@ handle_show_cwd(_Args) ->
     end.
 
 handle_change_cwd(#{<<"path">> := Path}) ->
-    case devout_fs_ops:change_cwd(Path) of
+    case devout_fs:change_cwd(Path) of
         {ok, NewCwd} ->
             NewCwdBin = list_to_binary(NewCwd),
             <<"Changed working directory to: ", NewCwdBin/binary>>;
@@ -240,7 +240,7 @@ handle_change_cwd(#{<<"path">> := Path}) ->
 
 handle_list_files(Args) ->
     Path = maps:get(<<"path">>, Args, <<".">>),
-    
+
     % Handle current directory specially
     ValidPath = case Path of
         <<".">> ->
@@ -251,7 +251,7 @@ handle_list_files(Args) ->
         _ ->
             devout_path_validator:validate_path(Path)
     end,
-    
+
     case ValidPath of
         {ok, DirPath} ->
             case file:list_dir(DirPath) of
@@ -273,7 +273,7 @@ handle_list_files(Args) ->
                                         end,
                                         Size = case FileInfo#file_info.type of
                                             directory -> <<"">>;
-                                            _ -> 
+                                            _ ->
                                                 SizeBytes = FileInfo#file_info.size,
                                                 <<" (", (integer_to_binary(SizeBytes))/binary, " bytes)">>
                                         end,
@@ -284,7 +284,7 @@ handle_list_files(Args) ->
                                         <<"[?] ", FileBin/binary, " (info unavailable)">>
                                 end
                             end, lists:sort(Files)),
-                            
+
                             FilesList = lists:join(<<"\n">>, DetailedFiles),
                             iolist_to_binary([<<"Contents of ", Path/binary, ":\n">>, FilesList])
                     end;
@@ -313,7 +313,7 @@ handle_status_resource(_Uri) ->
     {ok, AllowedOps} = application:get_env(devout, allowed_operations),
     OpsList = string:join([atom_to_list(Op) || Op <- AllowedOps], ", "),
     OpsListBin = list_to_binary(OpsList),
-    
+
     <<"Devout MCP Service Status\n\n"
       "Current working directory: ", CwdBin/binary, "\n"
       "Service: Active\n"
@@ -350,7 +350,7 @@ handle_help_resource(_Uri) ->
 handle_create_project_prompt(Args) ->
     ProjectName = maps:get(<<"project_name">>, Args, <<"my_project">>),
     ProjectType = maps:get(<<"project_type">>, Args, <<"web">>),
-    
+
     {Instructions, Dirs} = case ProjectType of
         <<"erlang">> ->
             {<<"Create an Erlang/OTP project structure">>,
@@ -368,10 +368,10 @@ handle_create_project_prompt(Args) ->
             {<<"Create a basic project structure">>,
              [<<"src">>, <<"tests">>, <<"docs">>]}
     end,
-    
+
     DirsText = string:join([binary_to_list(D) || D <- Dirs], ", "),
     DirsTextBin = list_to_binary(DirsText),
-    
+
     [#{
         <<"role">> => <<"user">>,
         <<"content">> => #{

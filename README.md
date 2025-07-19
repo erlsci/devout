@@ -42,7 +42,7 @@ A Model Context Protocol (MCP) server written in Erlang that provides file, dire
 - **Application**: `devout_app` - Standard OTP application callback
 - **Supervisor**: `devout_sup` - Manages server process lifecycle
 - **Server**: `devout_server` - Main gen_server coordinating with erlmcp
-- **Operations**: `devout_fs_ops` - File system operation implementations
+- **Operations**: `devout_fs` - File system operation implementations
 - **Validation**: `devout_path_validator` - Security and path validation
 - **Entry Point**: `devout_stdio_main` - Standalone stdio executable
 
@@ -50,10 +50,10 @@ A Model Context Protocol (MCP) server written in Erlang that provides file, dire
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Claude AI     │───▶│   devout_server  │───▶│ devout_fs_ops   │
+│   Claude AI     │───▶│   devout_server  │───▶│    devout_fs    │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
-                                │                        │
-                                ▼                        ▼
+                                │                       │
+                                ▼                       ▼
                        ┌──────────────────┐    ┌─────────────────┐
                        │ erlmcp_stdio     │    │ path_validator  │
                        │ (MCP Protocol)   │    │ (Security)      │
@@ -270,7 +270,7 @@ devout_server:start_stdio().
 ### Adding Operations
 
 1. **Add to allowed_operations** in `devout.app.src`
-2. **Implement in devout_fs_ops.erl** (if needed):
+2. **Implement in devout_fs.erl** (if needed):
 
    ```erlang
    my_operation(Path) ->
@@ -298,7 +298,7 @@ devout_server:start_stdio().
 
    ```erlang
    handle_my_operation(#{<<"path">> := Path}) ->
-       case devout_fs_ops:my_operation(Path) of
+       case devout_fs:my_operation(Path) of
            ok -> <<"Success message">>;
            {error, Reason} -> format_error(Reason)
        end.
